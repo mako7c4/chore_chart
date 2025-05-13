@@ -1,4 +1,4 @@
-# chore_chart
+# chore chart
 Simple chore charts for kids
 
 ## docker build:
