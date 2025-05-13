@@ -80,11 +80,17 @@
                         </div>
                 </div>
 
-                <div> <h2 class="text-xl sm:text-2xl font-semibold text-slate-600 mb-3 border-b pb-2">Manage Master Chores</h2>
-                    <div class="flex flex-col sm:flex-row gap-2 sm:gap-4 mb-4">
-                        <input type="text" id="newChoreName" placeholder="Chore Name" class="p-2 border rounded-lg flex-grow shadow-sm focus:ring-2 focus:ring-sky-500 outline-none text-sm sm:text-base">
-                        <input type="text" id="newChoreIcon" placeholder="Icon (e.g., 🛏️)" class="p-2 border rounded-lg w-full sm:w-24 shadow-sm focus:ring-2 focus:ring-sky-500 outline-none text-sm sm:text-base">
-                        <button id="addMasterChoreButton" class="px-3 py-2 sm:px-4 text-sm sm:text-base bg-green-500 hover:bg-green-600 text-white rounded-lg shadow transition-colors">Add Chore</button>
+                <div> 
+                    <h2 class="text-xl sm:text-2xl font-semibold text-slate-600 mb-3 border-b pb-2">Manage Master Chores</h2>
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-2 sm:gap-4 mb-4 items-end">
+                        <input type="text" id="newChoreName" placeholder="Chore Name" class="p-2 border rounded-lg shadow-sm focus:ring-2 focus:ring-sky-500 outline-none text-sm sm:text-base">
+                        <div class="flex gap-2">
+                            <select id="newChoreIconSelect" class="p-2 border rounded-lg shadow-sm focus:ring-2 focus:ring-sky-500 outline-none text-sm sm:text-base flex-grow">
+                                <option value="">-- Select Icon --</option>
+                                </select>
+                            <input type="text" id="newChoreIconManual" placeholder="Manual 🔧" class="p-2 border rounded-lg w-24 shadow-sm focus:ring-2 focus:ring-sky-500 outline-none text-sm sm:text-base">
+                        </div>
+                        <button id="addMasterChoreButton" class="sm:col-span-2 px-3 py-2 sm:px-4 text-sm sm:text-base bg-green-500 hover:bg-green-600 text-white rounded-lg shadow transition-colors">Add Chore</button>
                     </div>
                     <ul id="masterChoreListDisplay" class="space-y-1 text-sm sm:text-base">
                         </ul>
@@ -188,7 +194,9 @@
         const addKidButton = document.getElementById('addKidButton');
         const adminKidListDiv = document.getElementById('adminKidList');
         const newChoreNameInput = document.getElementById('newChoreName');
-        const newChoreIconInput = document.getElementById('newChoreIcon');
+        // Master Chore Icon Inputs
+        const newChoreIconSelect = document.getElementById('newChoreIconSelect');
+        const newChoreIconManual = document.getElementById('newChoreIconManual');
         const addMasterChoreButton = document.getElementById('addMasterChoreButton');
         const masterChoreListDisplay = document.getElementById('masterChoreListDisplay');
         const assignKidSelect = document.getElementById('assignKidSelect');
@@ -219,6 +227,22 @@
         let adminPassword = null; 
         const KID_AVATAR_COLORS = ['bg-pink-500', 'bg-indigo-500', 'bg-emerald-500', 'bg-purple-500', 'bg-orange-500'];
         let masterChoresDataCache = []; 
+
+        const DEFAULT_CHORE_ICONS = [
+            { name: "Make Bed", icon: "🛏️" },
+            { name: "Feed Dog", icon: "🐕" },
+            { name: "Brush Teeth", icon: "🦷" }, // or 🪥
+            { name: "Get Dressed", icon: "👕" },
+            { name: "Clean Room", icon: "🧹" }, // or ✨
+            { name: "Eat Breakfast", icon: "🥣" }, // or 🍳
+            { name: "Homework", icon: "📚" },
+            { name: "Set Table", icon: "🍽️" },
+            { name: "Clear Table", icon: "ափ" }, // Plate emoji (might not render well everywhere)
+            { name: "Tidy Toys", icon: "🧸" },
+            { name: "Read Book", icon: "📖" },
+            { name: "Water Plants", icon: "🪴" },
+            { name: "-- Manual Icon --", icon: "" } // For manual input
+        ];
 
         // --- API Helper ---
         async function apiCall(endpoint, method = 'GET', body = null, requiresAdmin = false) {
@@ -288,6 +312,33 @@
         function triggerBalloonAnimation(element) { /* ... (same as before) */ }
 
         function renderTrainTrack(kid) { /* ... (same as before) */ }
+
+        // --- Populate Default Chore Icons Select ---
+        function populateDefaultChoreIcons() {
+            newChoreIconSelect.innerHTML = '<option value="">-- Quick Icon --</option>'; // Default empty option
+            DEFAULT_CHORE_ICONS.forEach(item => {
+                const option = document.createElement('option');
+                option.value = item.icon;
+                option.textContent = `${item.icon} ${item.name}`;
+                newChoreIconSelect.appendChild(option);
+            });
+        }
+        
+        // Event listener for the newChoreIconSelect
+        newChoreIconSelect.addEventListener('change', () => {
+            const selectedValue = newChoreIconSelect.value;
+            if (selectedValue) { // If a real icon is selected (not the "-- Quick Icon --" or "-- Manual Icon --")
+                newChoreIconManual.value = selectedValue; // Populate manual input
+                // Optionally, you could also pre-fill chore name if the selected name is not "-- Manual Icon --"
+                const selectedChore = DEFAULT_CHORE_ICONS.find(c => c.icon === selectedValue);
+                if (selectedChore && selectedChore.name !== "-- Manual Icon --" && !newChoreNameInput.value) {
+                    newChoreNameInput.value = selectedChore.name;
+                }
+            } else { // If "-- Quick Icon --" is selected, clear manual input if user wants to type
+                // newChoreIconManual.value = ''; // Or keep it, user preference
+            }
+        });
+
 
         // --- Rendering Functions ---
         async function loadAndRenderKidSelectionView() {
@@ -533,13 +584,27 @@
                 }
             } else { showModal('Kid name and positive track length required.'); }
         };
+        
+        // Updated Add Master Chore Button
         addMasterChoreButton.onclick = async () => { 
-            const name = newChoreNameInput.value.trim(); const icon = newChoreIconInput.value.trim();
+            const name = newChoreNameInput.value.trim();
+            let icon = newChoreIconSelect.value; // Prioritize select
+            if (!icon || DEFAULT_CHORE_ICONS.find(c => c.icon === icon)?.name === "-- Manual Icon --") { // If select is empty or "Manual"
+                icon = newChoreIconManual.value.trim(); // Use manual input
+            }
+
             if (name) {
-                const newChore = await apiCall('/chores-master', 'POST', { name, icon }, true);
-                if (newChore) { newChoreNameInput.value = ''; newChoreIconInput.value = ''; loadAndRenderAdminView(); showModal(`Chore "${name}" added!`);}
+                const newChore = await apiCall('/chores-master', 'POST', { name, icon: icon || '🔧' }, true); // Default to wrench if both empty
+                if (newChore) { 
+                    newChoreNameInput.value = ''; 
+                    newChoreIconManual.value = ''; 
+                    newChoreIconSelect.value = ''; // Reset select
+                    loadAndRenderAdminView(); 
+                    showModal(`Chore "${name}" added!`);
+                }
             } else { showModal('Chore name required.');}
         };
+
         assignChoreButton.onclick = async () => { 
             const kidId = assignKidSelect.value; const choreId = parseInt(assignChoreSelect.value); const frequency = assignFrequencySelect.value;
             if (!choreId && assignChoreSelect.options.length > 0) { showModal('Please select a chore.'); return; }
@@ -560,7 +625,6 @@
             }
         };
         
-        // Kid's Chore Action (Mark Done / Undo)
         choresForKidList.addEventListener('click', async (e) => {
             const button = e.target.closest('.chore-action-btn');
             if (button) {
@@ -576,7 +640,6 @@
                 }
                 if (result) {
                     loadAndRenderKidChoresView(currentKidId); 
-                    // Only show modal for significant events, not every chore completion
                     if (result.daily_star_awarded) {
                         showModal("Great job! You earned a daily star! ⭐");
                     } else if (result.stars_from_balloons > 0) {
@@ -585,10 +648,9 @@
                         showModal("Daily star was un-earned.");
                     } else if (result.star_from_balloons_revoked) {
                         showModal("Balloon-star was un-earned and balloons returned.");
-                    } else if (isCompleted && result.message) { // Show message on undo if one is provided
+                    } else if (isCompleted && result.message) { 
                          showModal(result.message);
                     }
-                    // The generic "Chore marked complete!" message is now suppressed unless it's a special case above.
                 }
             }
         });
@@ -697,6 +759,7 @@
         modalCloseButton.onclick = hideModal;
         document.addEventListener('DOMContentLoaded', () => {
             console.log("DOM Content Loaded. Initializing app."); 
+            populateDefaultChoreIcons(); // Populate the new select dropdown
             currentDateDisplay.textContent = new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' });
             switchView('kidSelection');
         });
