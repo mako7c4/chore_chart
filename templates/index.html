@@ -1,0 +1,536 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Super Chore Chart V3!</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Inter', sans-serif; overscroll-behavior: none; }
+        .kid-avatar { width: 60px; height: 60px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 1.8rem; color: white; font-weight: bold; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .star-display, .balloon-display { font-size: 1.1rem; font-weight: bold; }
+        .chore-item { transition: all 0.3s ease; }
+        .chore-item.completed { opacity: 0.6; text-decoration: line-through; }
+        ::-webkit-scrollbar { width: 8px; }
+        ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
+        ::-webkit-scrollbar-track { background: #f1f5f9; }
+        .modal, .admin-login-modal { display: none; position: fixed; inset: 0; background-color: rgba(0,0,0,0.6); align-items: center; justify-content: center; z-index: 50; padding: 1rem; }
+        .modal.active, .admin-login-modal.active { display: flex; }
+        .balloon-animation { position: absolute; font-size: 2rem; animation: floatUp 1.5s ease-out forwards; pointer-events: none; z-index: 100; }
+        @keyframes floatUp { 0% { transform: translateY(0) scale(0.5); opacity: 1; } 100% { transform: translateY(-80px) scale(1.2); opacity: 0; } }
+
+        /* Train Track Styles */
+        .train-track-container { display: flex; align-items: center; margin-top: 8px; background-color: #e2e8f0; border-radius: 8px; padding: 4px; box-shadow: inset 0 1px 3px rgba(0,0,0,0.1); }
+        .track-segment { width: 20px; height: 20px; background-color: #94a3b8; margin: 0 2px; border-radius: 3px; display: flex; align-items: center; justify-content: center; font-size: 0.8rem; color: white; transition: background-color 0.3s ease; }
+        .track-segment.active { background-color: #fbbf24; /* amber-400 */ } /* Train position */
+        .track-segment.empty { background-color: #cbd5e1; /* cool-gray-300 */ }
+        .train-icon { font-size: 1rem; /* Smaller train */ }
+        .laps-display { font-size: 0.9rem; color: #475569; margin-left: 8px; font-weight: 500; }
+    </style>
+</head>
+<body class="bg-gradient-to-br from-sky-400 to-blue-600 min-h-screen flex flex-col items-center justify-center p-2 sm:p-4 selection:bg-yellow-300 selection:text-yellow-900">
+
+    <div id="app-container" class="bg-white/90 backdrop-blur-md shadow-2xl rounded-xl p-4 sm:p-6 w-full max-w-2xl min-h-[85vh] max-h-[95vh] sm:min-h-[80vh] sm:max-h-[90vh] flex flex-col">
+        <header class="mb-4 sm:mb-6 flex justify-between items-center">
+            <h1 class="text-2xl sm:text-3xl font-bold text-slate-700">🚂 Chore Express! 🌟</h1>
+            <div>
+                <button id="adminModeButton" class="px-3 py-1.5 sm:px-4 sm:py-2 text-sm sm:text-base bg-amber-500 hover:bg-amber-600 text-white rounded-lg shadow transition-colors">Admin</button>
+                <button id="kidSelectionButton" class="px-3 py-1.5 sm:px-4 sm:py-2 text-sm sm:text-base bg-teal-500 hover:bg-teal-600 text-white rounded-lg shadow transition-colors ml-2 hidden">Kids</button>
+            </div>
+        </header>
+
+        <main class="flex-grow overflow-y-auto p-1 sm:p-2 -m-1 sm:-m-2 relative">
+            <div id="kidSelectionView">
+                <h2 class="text-xl sm:text-2xl font-semibold text-slate-600 mb-4 text-center">Who are you?</h2>
+                <div id="kidList" class="grid grid-cols-1 gap-4">
+                    </div>
+                <p id="noKidsMessage" class="text-center text-slate-500 mt-6">Admin needs to add kids first!</p>
+            </div>
+
+            <div id="kidChoresView" class="hidden">
+                <div class="flex items-center mb-1">
+                    <div id="kidChoresAvatar" class="kid-avatar bg-pink-500 mr-3 sm:mr-4"></div>
+                    <div>
+                        <h2 id="kidNameDisplay" class="text-xl sm:text-2xl font-semibold text-slate-700"></h2>
+                        <div class="flex space-x-3 sm:space-x-4">
+                             <p id="kidStarsDisplay" class="star-display text-yellow-500">⭐ 0 Stars</p>
+                             <p id="kidBalloonsDisplay" class="balloon-display text-red-500">🎈 0 Balloons</p>
+                        </div>
+                    </div>
+                </div>
+                <h3 class="text-lg sm:text-xl font-semibold text-slate-600 my-2 sm:my-3">Today's Chores: <span id="currentDateDisplay"></span></h3>
+                <div id="choresForKidList" class="space-y-2 sm:space-y-3"></div>
+                <p id="noChoresForKidMessage" class="text-center text-slate-500 mt-6">No chores assigned for today, yay!</p>
+                <p id="allChoresDoneMessage" class="text-center text-green-600 font-semibold text-lg sm:text-xl mt-6 hidden">🎉 All chores done for today! Great job! 🎉</p>
+            </div>
+
+            <div id="adminView" class="hidden space-y-6 sm:space-y-8">
+                <div> <h2 class="text-xl sm:text-2xl font-semibold text-slate-600 mb-3 border-b pb-2">Manage Kids</h2>
+                    <div class="flex flex-col sm:flex-row gap-2 sm:gap-4 mb-4">
+                        <input type="text" id="newKidName" placeholder="Kid's Name" class="p-2 border rounded-lg flex-grow shadow-sm focus:ring-2 focus:ring-sky-500 outline-none text-sm sm:text-base">
+                        <input type="number" id="newKidTrainTrackLength" placeholder="Track Segments (e.g., 10)" class="p-2 border rounded-lg w-full sm:w-48 shadow-sm focus:ring-2 focus:ring-sky-500 outline-none text-sm sm:text-base" min="1" value="10">
+                        <button id="addKidButton" class="px-3 py-2 sm:px-4 text-sm sm:text-base bg-green-500 hover:bg-green-600 text-white rounded-lg shadow transition-colors">Add Kid</button>
+                    </div>
+                    <div id="adminKidList" class="space-y-3">
+                        </div>
+                </div>
+
+                <div> <h2 class="text-xl sm:text-2xl font-semibold text-slate-600 mb-3 border-b pb-2">Manage Master Chores</h2>
+                    <div class="flex flex-col sm:flex-row gap-2 sm:gap-4 mb-4">
+                        <input type="text" id="newChoreName" placeholder="Chore Name" class="p-2 border rounded-lg flex-grow shadow-sm focus:ring-2 focus:ring-sky-500 outline-none text-sm sm:text-base">
+                        <input type="text" id="newChoreIcon" placeholder="Icon (e.g., 🛏️)" class="p-2 border rounded-lg w-full sm:w-24 shadow-sm focus:ring-2 focus:ring-sky-500 outline-none text-sm sm:text-base">
+                        <button id="addMasterChoreButton" class="px-3 py-2 sm:px-4 text-sm sm:text-base bg-green-500 hover:bg-green-600 text-white rounded-lg shadow transition-colors">Add Chore</button>
+                    </div>
+                    <ul id="masterChoreListDisplay" class="list-disc list-inside text-slate-700 space-y-1 text-sm sm:text-base"></ul>
+                </div>
+
+                <div> <h2 class="text-xl sm:text-2xl font-semibold text-slate-600 mb-3 border-b pb-2">Assign Chores</h2>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4 items-end">
+                        <div>
+                            <label for="assignKidSelect" class="block text-xs sm:text-sm font-medium text-slate-700">Kid:</label>
+                            <select id="assignKidSelect" class="p-2 border rounded-lg w-full shadow-sm focus:ring-2 focus:ring-sky-500 outline-none text-sm sm:text-base">
+                                <option value="all">All Kids</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label for="assignChoreSelect" class="block text-xs sm:text-sm font-medium text-slate-700">Chore:</label>
+                            <select id="assignChoreSelect" class="p-2 border rounded-lg w-full shadow-sm focus:ring-2 focus:ring-sky-500 outline-none text-sm sm:text-base"></select>
+                        </div>
+                        <div>
+                            <label for="assignFrequencySelect" class="block text-xs sm:text-sm font-medium text-slate-700">Frequency:</label>
+                            <select id="assignFrequencySelect" class="p-2 border rounded-lg w-full shadow-sm focus:ring-2 focus:ring-sky-500 outline-none text-sm sm:text-base">
+                                <option value="daily">Daily</option> <option value="weekdays">Weekdays</option> <option value="weekends">Weekends</option>
+                                <option value="monday">Monday</option><option value="tuesday">Tuesday</option><option value="wednesday">Wednesday</option>
+                                <option value="thursday">Thursday</option><option value="friday">Friday</option><option value="saturday">Saturday</option>
+                                <option value="sunday">Sunday</option>
+                            </select>
+                        </div>
+                        <button id="assignChoreButton" class="px-3 py-2 sm:px-4 text-sm sm:text-base bg-blue-500 hover:bg-blue-600 text-white rounded-lg shadow transition-colors h-10">Assign</button>
+                    </div>
+                    <h3 class="text-md sm:text-lg font-semibold text-slate-600 mt-4 mb-2">Current Assignments:</h3>
+                    <div id="currentAssignmentsList" class="space-y-1.5 sm:space-y-2 text-xs sm:text-sm text-slate-700 max-h-32 sm:max-h-48 overflow-y-auto"></div>
+                </div>
+
+                <div> <h2 class="text-xl sm:text-2xl font-semibold text-slate-600 mb-3 border-b pb-2">Bonus Stars</h2>
+                     <div class="flex flex-col sm:flex-row gap-2 sm:gap-4 items-center">
+                        <select id="bonusKidSelect" class="p-2 border rounded-lg flex-grow shadow-sm focus:ring-2 focus:ring-sky-500 outline-none text-sm sm:text-base"></select>
+                        <input type="text" id="bonusReason" placeholder="Reason (optional)" class="p-2 border rounded-lg flex-grow shadow-sm focus:ring-2 focus:ring-sky-500 outline-none text-sm sm:text-base">
+                        <button id="awardBonusStarButton" class="px-3 py-2 sm:px-4 text-sm sm:text-base bg-yellow-400 hover:bg-yellow-500 text-slate-800 rounded-lg shadow transition-colors w-full sm:w-auto">Award Bonus Star</button>
+                    </div>
+                </div>
+            </div>
+        </main>
+
+        <div id="adminLoginModal" class="admin-login-modal">
+            <div class="bg-white p-6 sm:p-8 rounded-lg shadow-xl w-full max-w-xs sm:max-w-sm text-center">
+                <h3 class="text-lg sm:text-xl font-semibold text-slate-700 mb-4">Admin Access</h3>
+                <input type="password" id="adminPasswordInput" placeholder="Enter Admin Password" class="p-2 border rounded-lg w-full mb-4 shadow-sm focus:ring-2 focus:ring-sky-500 outline-none text-sm sm:text-base">
+                <button id="adminLoginSubmitButton" class="px-4 py-2 sm:px-6 text-sm sm:text-base bg-sky-500 hover:bg-sky-600 text-white rounded-lg w-full mb-2">Login</button>
+                <button id="adminLoginCancelButton" class="px-4 py-2 sm:px-6 text-sm sm:text-base bg-slate-300 hover:bg-slate-400 text-slate-700 rounded-lg w-full">Cancel</button>
+            </div>
+        </div>
+        
+        <div id="messageModal" class="modal">
+            <div class="bg-white p-6 rounded-lg shadow-xl w-full max-w-xs sm:max-w-sm text-center">
+                <p id="modalMessageText" class="text-md sm:text-lg text-slate-700 mb-4"></p>
+                <button id="modalCloseButton" class="px-4 py-2 sm:px-6 text-sm sm:text-base bg-sky-500 hover:bg-sky-600 text-white rounded-lg">OK</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // --- DOM Elements ---
+        const adminModeButton = document.getElementById('adminModeButton');
+        const kidSelectionButton = document.getElementById('kidSelectionButton');
+        const kidSelectionView = document.getElementById('kidSelectionView');
+        const kidChoresView = document.getElementById('kidChoresView');
+        const adminView = document.getElementById('adminView');
+        const kidListDiv = document.getElementById('kidList');
+        const noKidsMessage = document.getElementById('noKidsMessage');
+        const kidChoresAvatar = document.getElementById('kidChoresAvatar');
+        const kidNameDisplay = document.getElementById('kidNameDisplay');
+        const kidStarsDisplay = document.getElementById('kidStarsDisplay');
+        const kidBalloonsDisplay = document.getElementById('kidBalloonsDisplay');
+        const currentDateDisplay = document.getElementById('currentDateDisplay');
+        const choresForKidList = document.getElementById('choresForKidList');
+        const noChoresForKidMessage = document.getElementById('noChoresForKidMessage');
+        const allChoresDoneMessage = document.getElementById('allChoresDoneMessage');
+        const newKidNameInput = document.getElementById('newKidName');
+        const newKidTrainTrackLengthInput = document.getElementById('newKidTrainTrackLength');
+        const addKidButton = document.getElementById('addKidButton');
+        const adminKidListDiv = document.getElementById('adminKidList');
+        const newChoreNameInput = document.getElementById('newChoreName');
+        const newChoreIconInput = document.getElementById('newChoreIcon');
+        const addMasterChoreButton = document.getElementById('addMasterChoreButton');
+        const masterChoreListDisplay = document.getElementById('masterChoreListDisplay');
+        const assignKidSelect = document.getElementById('assignKidSelect');
+        const assignChoreSelect = document.getElementById('assignChoreSelect');
+        const assignFrequencySelect = document.getElementById('assignFrequencySelect');
+        const assignChoreButton = document.getElementById('assignChoreButton');
+        const currentAssignmentsList = document.getElementById('currentAssignmentsList');
+        const bonusKidSelect = document.getElementById('bonusKidSelect');
+        const bonusReasonInput = document.getElementById('bonusReason');
+        const awardBonusStarButton = document.getElementById('awardBonusStarButton');
+        const messageModal = document.getElementById('messageModal');
+        const modalMessageText = document.getElementById('modalMessageText');
+        const modalCloseButton = document.getElementById('modalCloseButton');
+        const adminLoginModal = document.getElementById('adminLoginModal');
+        const adminPasswordInput = document.getElementById('adminPasswordInput');
+        const adminLoginSubmitButton = document.getElementById('adminLoginSubmitButton');
+        const adminLoginCancelButton = document.getElementById('adminLoginCancelButton');
+
+        // --- State ---
+        let currentKidId = null;
+        let currentView = 'kidSelection';
+        let adminPassword = null; 
+        const KID_AVATAR_COLORS = ['bg-pink-500', 'bg-indigo-500', 'bg-emerald-500', 'bg-purple-500', 'bg-orange-500'];
+
+        // --- API Helper ---
+        async function apiCall(endpoint, method = 'GET', body = null, requiresAdmin = false) {
+            const headers = { 'Content-Type': 'application/json' };
+            if (requiresAdmin && adminPassword) {
+                headers['X-Admin-Password'] = adminPassword;
+            }
+            const options = { method, headers };
+            if (body) options.body = JSON.stringify(body);
+            try {
+                const response = await fetch(`/api${endpoint}`, options);
+                if (!response.ok) {
+                    const errorData = await response.json().catch(() => ({ error: `HTTP error! Status: ${response.status}` }));
+                    console.error('API Error:', errorData.error, response.status);
+                    showModal(errorData.error || `Request failed: ${response.status}`);
+                    if (response.status === 401 && requiresAdmin) {
+                        adminPassword = null; switchView('kidSelection'); showAdminLogin();
+                    }
+                    return null;
+                }
+                if (response.status === 204) return true;
+                return await response.json();
+            } catch (error) {
+                console.error('Fetch Error:', error);
+                showModal('Network error or server unavailable.');
+                return null;
+            }
+        }
+
+        // --- Modal Functions ---
+        function showModal(message) { modalMessageText.textContent = message; messageModal.classList.add('active'); }
+        function hideModal() { messageModal.classList.remove('active'); }
+        function showAdminLogin() { adminPasswordInput.value = ''; adminLoginModal.classList.add('active'); }
+        function hideAdminLogin() { adminLoginModal.classList.remove('active'); }
+
+        // --- View Switching ---
+        function switchView(viewName) {
+            currentView = viewName;
+            [kidSelectionView, kidChoresView, adminView].forEach(v => v.classList.add('hidden'));
+            kidSelectionButton.classList.add('hidden');
+            adminModeButton.classList.remove('hidden');
+            if (viewName === 'kidSelection') {
+                kidSelectionView.classList.remove('hidden'); loadAndRenderKidSelectionView();
+            } else if (viewName === 'kidChores') {
+                kidChoresView.classList.remove('hidden'); kidSelectionButton.classList.remove('hidden');
+                loadAndRenderKidChoresView(currentKidId);
+            } else if (viewName === 'admin') {
+                if (!adminPassword) { showAdminLogin(); return; }
+                adminView.classList.remove('hidden'); kidSelectionButton.classList.remove('hidden');
+                adminModeButton.classList.add('hidden'); loadAndRenderAdminView();
+            }
+        }
+        
+        // --- Balloon Animation ---
+        function triggerBalloonAnimation(element) {
+            const balloonEmoji = document.createElement('div');
+            balloonEmoji.textContent = '🎈'; balloonEmoji.className = 'balloon-animation';
+            const rect = element.getBoundingClientRect();
+            const appRect = document.getElementById('app-container').getBoundingClientRect();
+            balloonEmoji.style.left = `${rect.left - appRect.left + rect.width / 2 - 10}px`;
+            balloonEmoji.style.top = `${rect.top - appRect.top - 20}px`;
+            document.querySelector('main').appendChild(balloonEmoji);
+            setTimeout(() => balloonEmoji.remove(), 1500);
+        }
+
+        // --- Render Train Track ---
+        function renderTrainTrack(kid) {
+            const container = document.createElement('div');
+            container.className = 'train-track-container';
+            const trackLength = kid.train_track_length || 10;
+            const currentStars = kid.stars_count || 0;
+            const trainPosition = trackLength > 0 ? currentStars % trackLength : 0;
+
+            for (let i = 0; i < trackLength; i++) {
+                const segment = document.createElement('div');
+                segment.className = 'track-segment';
+                if (i === trainPosition) {
+                    segment.classList.add('active');
+                    segment.innerHTML = '<span class="train-icon">🚂</span>';
+                } else {
+                    segment.classList.add('empty');
+                }
+                container.appendChild(segment);
+            }
+            const lapsDisplay = document.createElement('span');
+            lapsDisplay.className = 'laps-display';
+            lapsDisplay.textContent = `Laps: ${kid.train_laps_completed || 0}`;
+            container.appendChild(lapsDisplay);
+            return container;
+        }
+
+        // --- Rendering Functions ---
+        async function loadAndRenderKidSelectionView() {
+            const kids = await apiCall('/kids');
+            kidListDiv.innerHTML = '';
+            if (!kids || kids.length === 0) {
+                noKidsMessage.classList.remove('hidden'); kidListDiv.classList.add('hidden');
+            } else {
+                noKidsMessage.classList.add('hidden'); kidListDiv.classList.remove('hidden');
+                kids.forEach(kid => {
+                    const kidCard = document.createElement('div');
+                    kidCard.className = `p-3 sm:p-4 rounded-xl shadow-lg text-white cursor-pointer hover:scale-105 transition-transform ${kid.avatar_color || 'bg-sky-500'}`;
+                    kidCard.onclick = () => { currentKidId = kid.id; switchView('kidChores'); };
+                    
+                    const kidInfoDiv = document.createElement('div');
+                    kidInfoDiv.className = 'flex items-center mb-2';
+                    const avatar = document.createElement('div');
+                    avatar.className = `kid-avatar mr-3 ${kid.avatar_color || 'bg-sky-500'}`; // Ensure avatar has bg color
+                    avatar.textContent = kid.name.charAt(0).toUpperCase();
+                    kidInfoDiv.appendChild(avatar);
+                    const nameText = document.createElement('p');
+                    nameText.className = 'text-lg sm:text-xl font-semibold';
+                    nameText.textContent = kid.name;
+                    kidInfoDiv.appendChild(nameText);
+                    kidCard.appendChild(kidInfoDiv);
+
+                    const trainTrackElement = renderTrainTrack(kid);
+                    kidCard.appendChild(trainTrackElement);
+                    kidListDiv.appendChild(kidCard);
+                });
+            }
+        }
+
+        async function loadAndRenderKidChoresView(kidId) {
+            if (!kidId) { switchView('kidSelection'); return; }
+            const data = await apiCall(`/kids/${kidId}/chores-today`);
+            if (!data || !data.kid_info) { switchView('kidSelection'); return; }
+            const { kid_info, chores } = data;
+            kidNameDisplay.textContent = kid_info.name;
+            kidChoresAvatar.className = `kid-avatar ${kid_info.avatar_color || 'bg-pink-500'} mr-3 sm:mr-4`;
+            kidChoresAvatar.textContent = kid_info.name.charAt(0).toUpperCase();
+            kidStarsDisplay.innerHTML = `⭐ ${kid_info.stars_count} Star${kid_info.stars_count === 1 ? '' : 's'}`;
+            kidBalloonsDisplay.innerHTML = `🎈 ${kid_info.balloons} Balloon${kid_info.balloons === 1 ? '' : 's'}`;
+            currentDateDisplay.textContent = new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' });
+            choresForKidList.innerHTML = '';
+            if (chores.length === 0) {
+                noChoresForKidMessage.classList.remove('hidden'); allChoresDoneMessage.classList.add('hidden');
+            } else {
+                noChoresForKidMessage.classList.add('hidden');
+                let allMarkedComplete = true;
+                chores.forEach(chore => {
+                    const isCompleted = chore.completed_today;
+                    const choreDiv = document.createElement('div');
+                    choreDiv.className = `chore-item flex items-center justify-between p-3 sm:p-4 bg-slate-100 rounded-lg shadow ${isCompleted ? 'completed' : ''}`;
+                    choreDiv.innerHTML = `
+                        <div class="flex items-center">
+                            <span class="text-xl sm:text-2xl mr-2 sm:mr-3">${chore.chore_icon || '🔧'}</span>
+                            <span class="text-slate-700 text-sm sm:text-base">${chore.chore_name}</span>
+                        </div>
+                        <button data-assignment-id="${chore.assignment_id}" data-chore-id="${chore.chore_id}" 
+                                class="chore-action-btn px-3 py-1.5 sm:px-4 sm:py-2 rounded-lg text-white transition-colors text-xs sm:text-sm
+                                       ${isCompleted ? 'bg-orange-500 hover:bg-orange-600' : 'bg-green-500 hover:bg-green-600'}">
+                            ${isCompleted ? 'Undo' : 'Mark Done'}
+                        </button>
+                    `;
+                    choresForKidList.appendChild(choreDiv);
+                    if (!isCompleted) allMarkedComplete = false;
+                });
+                allChoresDoneMessage.classList.toggle('hidden', !allMarkedComplete);
+            }
+        }
+
+        async function loadAndRenderAdminView() {
+            const kids = await apiCall('/kids', 'GET', null, true);
+            const masterChores = await apiCall('/chores-master', 'GET', null, true);
+            const assignments = await apiCall('/assignments', 'GET', null, true);
+            if (!kids || !masterChores || !assignments) return;
+
+            adminKidListDiv.innerHTML = '';
+            let kidOptionsHTML = '<option value="all">All Kids</option>';
+            kids.forEach(kid => {
+                const kidDiv = document.createElement('div');
+                kidDiv.className = 'p-3 bg-slate-100 rounded-lg shadow-sm space-y-2';
+                kidDiv.innerHTML = `
+                    <div class="flex justify-between items-center">
+                        <span class="font-semibold text-md sm:text-lg">${kid.name}</span>
+                        <span class="text-xs sm:text-sm">⭐ ${kid.stars_count} | 🎈 ${kid.balloons} | 🚂 Laps: ${kid.train_laps_completed}</span>
+                    </div>
+                    <div class="flex flex-col sm:flex-row gap-2 items-center">
+                        <input type="number" value="${kid.train_track_length}" min="1" class="admin-kid-train-length p-1.5 border rounded-md w-full sm:w-24 text-xs sm:text-sm" data-kid-id="${kid.id}" placeholder="Track Len">
+                        <button class="admin-update-train-length-btn px-2 py-1.5 text-xs sm:text-sm bg-sky-500 hover:bg-sky-600 text-white rounded-md w-full sm:w-auto" data-kid-id="${kid.id}">Set Track</button>
+                    </div>
+                    <div class="grid grid-cols-2 sm:grid-cols-3 gap-2 mt-1">
+                        <button class="admin-reset-chores-btn px-2 py-1.5 text-xs sm:text-sm bg-red-500 hover:bg-red-600 text-white rounded-md" data-kid-id="${kid.id}">Reset Day</button>
+                        <button class="admin-decrement-balloons-btn px-2 py-1.5 text-xs sm:text-sm bg-rose-500 hover:bg-rose-600 text-white rounded-md" data-kid-id="${kid.id}">-1 🎈</button>
+                        <button class="admin-decrement-stars-btn px-2 py-1.5 text-xs sm:text-sm bg-purple-500 hover:bg-purple-600 text-white rounded-md" data-kid-id="${kid.id}">-1 ⭐</button>
+                    </div>
+                `;
+                adminKidListDiv.appendChild(kidDiv);
+                kidOptionsHTML += `<option value="${kid.id}">${kid.name}</option>`;
+            });
+            assignKidSelect.innerHTML = kidOptionsHTML;
+            bonusKidSelect.innerHTML = kids.map(k => `<option value="${k.id}">${k.name}</option>`).join('');
+
+            masterChoreListDisplay.innerHTML = '';
+            let choreOptionsHTML = '';
+            masterChores.forEach(chore => {
+                const li = document.createElement('li');
+                li.textContent = `${chore.icon || '🔧'} ${chore.name}`;
+                masterChoreListDisplay.appendChild(li);
+                choreOptionsHTML += `<option value="${chore.id}">${chore.name}</option>`;
+            });
+            assignChoreSelect.innerHTML = choreOptionsHTML;
+            renderCurrentAssignments(assignments);
+        }
+
+        function renderCurrentAssignments(assignmentsData) {
+            currentAssignmentsList.innerHTML = '';
+            if (!assignmentsData || assignmentsData.length === 0) {
+                currentAssignmentsList.innerHTML = '<p class="text-slate-500">No chores assigned yet.</p>'; return;
+            }
+            assignmentsData.forEach(assignment => {
+                const div = document.createElement('div');
+                div.className = 'p-1.5 sm:p-2 bg-slate-50 rounded border border-slate-200 flex justify-between items-center';
+                div.innerHTML = `
+                    <span><strong>${assignment.kid_name}</strong> - ${assignment.chore_name} (${assignment.frequency})</span>
+                    <button data-assignment-id="${assignment.id}" class="remove-assignment-btn text-red-500 hover:text-red-700 text-xs font-semibold">Remove</button>
+                `;
+                currentAssignmentsList.appendChild(div);
+            });
+        }
+
+        // --- Event Handlers ---
+        adminLoginSubmitButton.onclick = () => {
+            const pwd = adminPasswordInput.value; if (!pwd) { showModal("Please enter admin password."); return; }
+            adminPassword = pwd; hideAdminLogin(); switchView('admin');
+        };
+        adminLoginCancelButton.onclick = hideAdminLogin;
+
+        addKidButton.onclick = async () => {
+            const name = newKidNameInput.value.trim();
+            const trackLength = parseInt(newKidTrainTrackLengthInput.value) || 10;
+            if (name && trackLength > 0) {
+                const avatarColor = KID_AVATAR_COLORS[document.querySelectorAll('#adminKidList > div').length % KID_AVATAR_COLORS.length];
+                const newKid = await apiCall('/kids', 'POST', { name, avatarColor, trainTrackLength: trackLength }, true);
+                if (newKid) {
+                    newKidNameInput.value = ''; newKidTrainTrackLengthInput.value = '10';
+                    loadAndRenderAdminView(); showModal(`${name} added!`);
+                }
+            } else { showModal('Kid name and positive track length required.'); }
+        };
+
+        addMasterChoreButton.onclick = async () => { /* Same as before, ensure it calls loadAndRenderAdminView */ 
+            const name = newChoreNameInput.value.trim(); const icon = newChoreIconInput.value.trim();
+            if (name) {
+                const newChore = await apiCall('/chores-master', 'POST', { name, icon }, true);
+                if (newChore) { newChoreNameInput.value = ''; newChoreIconInput.value = ''; loadAndRenderAdminView(); showModal(`Chore "${name}" added!`);}
+            } else { showModal('Chore name required.');}
+        };
+        assignChoreButton.onclick = async () => { /* Same as before, ensure it calls loadAndRenderAdminView */ 
+            const kidId = assignKidSelect.value; const choreId = parseInt(assignChoreSelect.value); const frequency = assignFrequencySelect.value;
+            if (!choreId) { showModal('Please select a chore.'); return; }
+            const result = await apiCall('/assignments', 'POST', { kidId, choreId, frequency }, true);
+            if (result) { loadAndRenderAdminView(); showModal(result.message || 'Chore assigned!');}
+        };
+        currentAssignmentsList.addEventListener('click', async (e) => { /* Same as before, ensure it calls loadAndRenderAdminView */ 
+            if (e.target.classList.contains('remove-assignment-btn')) {
+                const assignmentId = parseInt(e.target.dataset.assignmentId);
+                if (await apiCall(`/assignments/${assignmentId}`, 'DELETE', null, true)) {
+                    loadAndRenderAdminView(); showModal('Assignment removed.');
+                }
+            }
+        });
+        awardBonusStarButton.onclick = async () => { /* Same as before, ensure it calls loadAndRenderAdminView and kid's view */ 
+            const kidId = parseInt(bonusKidSelect.value); const reason = bonusReasonInput.value.trim();
+            if (!kidId && bonusKidSelect.options.length > 0) { showModal('Please select a kid.'); return; }
+            else if (bonusKidSelect.options.length === 0) { showModal('No kids to award stars.'); return; }
+
+            const result = await apiCall('/stars/bonus', 'POST', { kidId, reason }, true);
+            if (result) {
+                loadAndRenderAdminView(); 
+                if (currentView === 'kidChores' && currentKidId === kidId) loadAndRenderKidChoresView(kidId);
+                showModal(result.message || 'Bonus star awarded!'); bonusReasonInput.value = '';
+            }
+        };
+
+        // Kid's Chore Action (Mark Done / Undo)
+        choresForKidList.addEventListener('click', async (e) => {
+            const button = e.target.closest('.chore-action-btn');
+            if (button) {
+                const assignmentId = parseInt(button.dataset.assignmentId);
+                const choreId = parseInt(button.dataset.choreId); // Needed for marking complete
+                const isCompleted = button.textContent.trim().toLowerCase() === 'undo';
+
+                let result;
+                if (isCompleted) { // Action is to Undo
+                    result = await apiCall('/completions/uncheck', 'POST', { kidId: currentKidId, assignmentId });
+                } else { // Action is to Mark Done
+                    triggerBalloonAnimation(button);
+                    result = await apiCall('/completions', 'POST', { kidId: currentKidId, assignmentId, choreId });
+                }
+
+                if (result) {
+                    loadAndRenderKidChoresView(currentKidId); // Refresh view
+                    // Optional: More specific messages based on result flags
+                    if (result.daily_star_awarded) showModal("Great job! You earned a daily star! ⭐");
+                    else if (result.stars_from_balloons > 0) showModal(`Wow! You converted balloons into ${result.stars_from_balloons} star(s)! ⭐`);
+                    else if (result.daily_star_revoked) showModal("Daily star was un-earned.");
+                    else if (result.star_from_balloons_revoked) showModal("Balloon-star was un-earned and balloons returned.");
+                    else if (result.message) showModal(result.message);
+                }
+            }
+        });
+        
+        // Admin Kid-Specific Actions (Event Delegation)
+        adminKidListDiv.addEventListener('click', async (e) => {
+            const target = e.target;
+            const kidId = target.dataset.kidId;
+            if (!kidId) return;
+
+            if (target.classList.contains('admin-update-train-length-btn')) {
+                const inputEl = target.closest('div').querySelector('.admin-kid-train-length');
+                const newLength = parseInt(inputEl.value);
+                if (newLength > 0) {
+                    const result = await apiCall(`/admin/kids/${kidId}/train-config`, 'PUT', { train_track_length: newLength }, true);
+                    if (result) { showModal(result.message); loadAndRenderAdminView(); }
+                } else { showModal("Track length must be positive."); }
+            } else if (target.classList.contains('admin-reset-chores-btn')) {
+                if (confirm(`Reset all of today's chores for this kid?`)) {
+                    const result = await apiCall(`/admin/kids/${kidId}/reset-daily-chores`, 'POST', null, true);
+                    if (result) { showModal(result.message); loadAndRenderAdminView(); if(currentKidId == kidId && currentView == 'kidChores') loadAndRenderKidChoresView(kidId); }
+                }
+            } else if (target.classList.contains('admin-decrement-balloons-btn')) {
+                 const numToDecrement = parseInt(prompt("How many balloons to decrement?", "1")) || 0;
+                 if (numToDecrement > 0) {
+                    const result = await apiCall(`/admin/kids/${kidId}/decrement-balloons`, 'POST', { count: numToDecrement }, true);
+                    if (result) { showModal(result.message); loadAndRenderAdminView(); if(currentKidId == kidId && currentView == 'kidChores') loadAndRenderKidChoresView(kidId); }
+                 }
+            } else if (target.classList.contains('admin-decrement-stars-btn')) {
+                const numToDecrement = parseInt(prompt("How many stars to decrement?", "1")) || 0;
+                if (numToDecrement > 0) {
+                    // Could add a prompt for star type: 'any', 'daily', 'bonus', 'balloon_conversion'
+                    const result = await apiCall(`/admin/kids/${kidId}/decrement-stars`, 'POST', { count: numToDecrement, type: 'any' }, true);
+                    if (result) { showModal(result.message); loadAndRenderAdminView(); if(currentKidId == kidId && currentView == 'kidChores') loadAndRenderKidChoresView(kidId); }
+                }
+            }
+        });
+
+        // --- Navigation & Initial Load ---
+        adminModeButton.onclick = () => switchView('admin');
+        kidSelectionButton.onclick = () => { currentKidId = null; switchView('kidSelection'); };
+        modalCloseButton.onclick = hideModal;
+        document.addEventListener('DOMContentLoaded', () => {
+            currentDateDisplay.textContent = new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' });
+            switchView('kidSelection');
+        });
+    </script>
+</body>
+</html>
