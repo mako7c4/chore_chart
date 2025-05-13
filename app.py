@@ -7,16 +7,45 @@ from datetime import date # Use date for date comparisons
 
 # --- App Configuration ---
 app = Flask(__name__)
-DATABASE = 'chore_chart.db'
-ADMIN_PASSWORD = os.environ.get('ADMIN_PASSWORD', 'supersecret') # Add -e ADMIN_PASSWORD="your_strong_password" with docker run to not use the default
-BALLOONS_PER_STAR = 10 # Make this configurable if needed later
+
+# Updated Database Path Configuration
+# The database will be stored in a 'data' subdirectory within the app's root.
+# In Docker, app.root_path will be '/app', so this will be '/app/data/chore_chart.db'.
+DATABASE_SUBDIR = 'data'
+DATABASE_FILENAME = 'chore_chart.db'
+DATABASE = os.path.join(DATABASE_SUBDIR, DATABASE_FILENAME) # Relative path for use within the app
+
+ADMIN_PASSWORD = os.environ.get('ADMIN_PASSWORD', 'supersecret')
+BALLOONS_PER_STAR = 10
 
 # --- Database Setup & Helpers ---
 def get_db():
+    # Construct the absolute path to the database file
+    # app.root_path is the application's root directory (e.g., /app in Docker)
+    db_path = os.path.join(app.root_path, DATABASE)
+    db_dir = os.path.dirname(db_path)
+
+    # Create the data directory if it doesn't exist
+    # This is important for the first run or if the directory gets removed.
+    if not os.path.exists(db_dir):
+        try:
+            os.makedirs(db_dir)
+            print(f"Created database directory: {db_dir}")
+        except OSError as e:
+            print(f"Error creating database directory {db_dir}: {e}")
+            # Depending on the error, you might want to raise it or handle it differently
+            raise
+
+    # Standard database connection logic
     db = getattr(g, '_database', None)
     if db is None:
-        db = g._database = sqlite3.connect(DATABASE)
-        db.row_factory = sqlite3.Row
+        try:
+            db = g._database = sqlite3.connect(db_path)
+            db.row_factory = sqlite3.Row # Access columns by name
+            print(f"Successfully connected to database: {db_path}")
+        except sqlite3.Error as e:
+            print(f"Error connecting to database {db_path}: {e}")
+            raise # Or handle error appropriately
     return db
 
 @app.teardown_appcontext
@@ -40,7 +69,7 @@ def execute_db(query, args=()):
     cur.close()
     return last_row_id
 
-# --- Schema (Updated) ---
+# --- Schema (Unchanged from v3, but shown for completeness) ---
 SCHEMA_SQL = """
 DROP TABLE IF EXISTS kids;
 CREATE TABLE kids (
@@ -116,7 +145,7 @@ def update_train_laps(kid_id):
 def index():
     return render_template('index.html')
 
-# --- Kids API (Updated) ---
+# --- Kids API (Updated for train track length on add) ---
 @app.route('/api/kids', methods=['GET'])
 def get_kids():
     kids_data = query_db("""
@@ -140,7 +169,7 @@ def add_kid():
                         (name, avatar_color, track_length))
     return jsonify({"id": kid_id, "name": name, "avatarColor": avatar_color, "balloons": 0, "stars_count": 0, "train_track_length": track_length, "train_laps_completed": 0}), 201
 
-# --- Master Chores & Assignments API (Mostly Unchanged, ensure they exist) ---
+# --- Master Chores & Assignments API (Mostly Unchanged from v3) ---
 @app.route('/api/chores-master', methods=['GET'])
 def get_master_chores():
     chores_data = query_db("SELECT * FROM chores_master")
@@ -193,7 +222,7 @@ def delete_assignment(assignment_id):
     execute_db("DELETE FROM chore_assignments WHERE id = ?", (assignment_id,))
     return jsonify({"message": "Assignment removed"}), 200
 
-# --- Chore Completions & Rewards API (Updated) ---
+# --- Chore Completions & Rewards API (Unchanged from v3) ---
 def get_chores_for_kid_today_internal(kid_id, today_date_obj):
     today_date_str = today_date_obj.isoformat()
     day_of_week_idx = today_date_obj.weekday()
@@ -246,7 +275,7 @@ def mark_chore_complete():
         execute_db("UPDATE kids SET balloons = ? WHERE id = ?", (remaining_balloons, kid_id,))
         for _ in range(stars_from_balloons):
             execute_db("INSERT INTO stars (kid_id, date_awarded, type, reason) VALUES (?, ?, 'balloon_conversion', ? || ' balloons earned')", (kid_id, today_date_str, BALLOONS_PER_STAR))
-            update_train_laps(kid_id) # Update laps after star award
+            update_train_laps(kid_id) 
     
     daily_star_awarded_this_action = False
     chores_due_today = get_chores_for_kid_today_internal(kid_id, today_date_obj)
@@ -257,7 +286,7 @@ def mark_chore_complete():
             if not daily_star_exists:
                 execute_db("INSERT INTO stars (kid_id, date_awarded, type, reason) VALUES (?, ?, 'daily', 'All daily chores completed')", (kid_id, today_date_str))
                 daily_star_awarded_this_action = True
-                update_train_laps(kid_id) # Update laps after star award
+                update_train_laps(kid_id)
 
     updated_kid_info = query_db("SELECT k.balloons, k.train_track_length, k.train_laps_completed, COUNT(s.id) as stars_count FROM kids k LEFT JOIN stars s ON k.id = s.kid_id WHERE k.id = ? GROUP BY k.id", (kid_id,), one=True)
     return jsonify({"message": "Chore marked complete!", "balloons_awarded": 1, "stars_from_balloons": stars_from_balloons, "daily_star_awarded": daily_star_awarded_this_action, "updated_kid_stats": dict(updated_kid_info) if updated_kid_info else {}}), 200
@@ -273,42 +302,35 @@ def uncheck_chore_complete():
     
     execute_db("DELETE FROM chore_completions WHERE id = ?", (completion_to_delete['id'],))
     
-    # Decrement balloon
     kid_balloons_before = query_db("SELECT balloons FROM kids WHERE id = ?", (kid_id,), one=True)['balloons']
     if kid_balloons_before > 0:
         execute_db("UPDATE kids SET balloons = balloons - 1 WHERE id = ?", (kid_id,))
     
-    # Check if a daily star needs to be revoked
     daily_star_revoked = False
-    chores_due_today = get_chores_for_kid_today_internal(kid_id, today_date_obj) # Re-check completion status
+    chores_due_today = get_chores_for_kid_today_internal(kid_id, today_date_obj) 
     all_done_after_uncheck = all(c['completed_today'] for c in chores_due_today) if chores_due_today else False
     
     daily_star_record = query_db("SELECT id FROM stars WHERE kid_id = ? AND date_awarded = ? AND type = 'daily'", (kid_id, today_date_str), one=True)
     if daily_star_record and not all_done_after_uncheck:
         execute_db("DELETE FROM stars WHERE id = ?", (daily_star_record['id'],))
         daily_star_revoked = True
-        update_train_laps(kid_id) # Recalculate laps
+        update_train_laps(kid_id)
 
-    # Check if a balloon_conversion star needs to be revoked
-    # This is complex: if unchecking causes balloons to drop below a multiple of BALLOONS_PER_STAR,
-    # and a conversion star was awarded *today* due to that threshold.
     star_from_balloons_revoked = False
-    if kid_balloons_before % BALLOONS_PER_STAR == 0 and kid_balloons_before > 0: # This chore's balloon might have caused a star
-        # If after decrementing 1 balloon, we are now at (multiple of BALLOONS_PER_STAR) - 1
+    if kid_balloons_before % BALLOONS_PER_STAR == 0 and kid_balloons_before > 0: 
         current_balloons = query_db("SELECT balloons FROM kids WHERE id = ?", (kid_id,), one=True)['balloons']
-        if current_balloons == (BALLOONS_PER_STAR - 1): # e.g., went from 10 to 9, or 20 to 19
-            # Check if a balloon_conversion star was awarded today
+        if current_balloons == (BALLOONS_PER_STAR - 1): 
             conversion_star = query_db("SELECT id FROM stars WHERE kid_id = ? AND date_awarded = ? AND type = 'balloon_conversion' ORDER BY id DESC LIMIT 1", (kid_id, today_date_str), one=True)
             if conversion_star:
                 execute_db("DELETE FROM stars WHERE id = ?", (conversion_star['id'],))
-                execute_db("UPDATE kids SET balloons = balloons + ? WHERE id = ?", (BALLOONS_PER_STAR -1, kid_id,)) # Give back (BALLOONS_PER_STAR - 1) balloons (total 9 if 10/star)
+                execute_db("UPDATE kids SET balloons = balloons + ? WHERE id = ?", (BALLOONS_PER_STAR -1, kid_id,)) 
                 star_from_balloons_revoked = True
-                update_train_laps(kid_id) # Recalculate laps
+                update_train_laps(kid_id) 
 
     updated_kid_info = query_db("SELECT k.balloons, k.train_track_length, k.train_laps_completed, COUNT(s.id) as stars_count FROM kids k LEFT JOIN stars s ON k.id = s.kid_id WHERE k.id = ? GROUP BY k.id", (kid_id,), one=True)
     return jsonify({"message": "Chore unchecked.", "daily_star_revoked": daily_star_revoked, "star_from_balloons_revoked": star_from_balloons_revoked, "updated_kid_stats": dict(updated_kid_info) if updated_kid_info else {}}), 200
 
-# --- Bonus Stars API (Updated for laps) ---
+# --- Bonus Stars API (Unchanged from v3) ---
 @app.route('/api/stars/bonus', methods=['POST'])
 def award_bonus_star():
     if not check_admin_auth(): return jsonify({"error": "Unauthorized"}), 401
@@ -316,32 +338,28 @@ def award_bonus_star():
     today_date_str = date.today().isoformat()
     if not kid_id: return jsonify({"error": "Kid ID is required"}), 400
     execute_db("INSERT INTO stars (kid_id, date_awarded, type, reason) VALUES (?, ?, 'bonus', ?)", (kid_id, today_date_str, reason))
-    update_train_laps(kid_id) # Update laps after star award
+    update_train_laps(kid_id) 
     return jsonify({"message": "Bonus star awarded"}), 201
 
-# --- Admin Reset & Decrement Endpoints ---
+# --- Admin Reset & Decrement Endpoints (Unchanged from v3) ---
 @app.route('/api/admin/kids/<int:kid_id>/reset-daily-chores', methods=['POST'])
 def admin_reset_daily_chores():
     if not check_admin_auth(): return jsonify({"error": "Unauthorized"}), 401
     today_date_str = date.today().isoformat()
-    # Delete today's completions for the kid
     execute_db("DELETE FROM chore_completions WHERE kid_id = ? AND date_completed = ?", (kid_id, today_date_str))
-    # Delete any daily star awarded today for this kid
     daily_star_record = query_db("SELECT id FROM stars WHERE kid_id = ? AND date_awarded = ? AND type = 'daily'", (kid_id, today_date_str), one=True)
     if daily_star_record:
         execute_db("DELETE FROM stars WHERE id = ?", (daily_star_record['id'],))
-        update_train_laps(kid_id) # Recalculate laps
+        update_train_laps(kid_id) 
     return jsonify({"message": f"Daily chores and daily star (if any) for kid {kid_id} reset for today."}), 200
 
 @app.route('/api/admin/kids/<int:kid_id>/decrement-balloons', methods=['POST'])
 def admin_decrement_balloons():
     if not check_admin_auth(): return jsonify({"error": "Unauthorized"}), 401
-    data = request.json
-    count = data.get('count', 1)
+    data = request.json; count = data.get('count', 1)
     try: count = int(count)
     except ValueError: return jsonify({"error": "Invalid count"}), 400
     if count <= 0: return jsonify({"error": "Count must be positive"}), 400
-
     current_balloons = query_db("SELECT balloons FROM kids WHERE id = ?", (kid_id,), one=True)['balloons']
     new_balloons = max(0, current_balloons - count)
     execute_db("UPDATE kids SET balloons = ? WHERE id = ?", (new_balloons, kid_id))
@@ -350,60 +368,78 @@ def admin_decrement_balloons():
 @app.route('/api/admin/kids/<int:kid_id>/decrement-stars', methods=['POST'])
 def admin_decrement_stars():
     if not check_admin_auth(): return jsonify({"error": "Unauthorized"}), 401
-    data = request.json
-    count = data.get('count', 1)
-    star_type_filter = data.get('type', None) # e.g., 'daily', 'bonus', 'balloon_conversion', or None for any
+    data = request.json; count = data.get('count', 1); star_type_filter = data.get('type', None)
     try: count = int(count)
     except ValueError: return jsonify({"error": "Invalid count"}), 400
     if count <= 0: return jsonify({"error": "Count must be positive"}), 400
-
-    # Fetch stars to delete (oldest first, or specific type)
-    sql = "SELECT id FROM stars WHERE kid_id = ?"
-    params = [kid_id]
-    if star_type_filter and star_type_filter != "any":
-        sql += " AND type = ?"
-        params.append(star_type_filter)
-    sql += " ORDER BY date_awarded ASC, id ASC LIMIT ?" # Delete oldest stars first
-    params.append(count)
-    
+    sql = "SELECT id FROM stars WHERE kid_id = ?"; params = [kid_id]
+    if star_type_filter and star_type_filter != "any": sql += " AND type = ?"; params.append(star_type_filter)
+    sql += " ORDER BY date_awarded ASC, id ASC LIMIT ?"; params.append(count)
     stars_to_delete = query_db(sql, tuple(params))
-    
-    if not stars_to_delete:
-        return jsonify({"message": "No matching stars found to decrement."}), 404
-
-    for star_row in stars_to_delete:
-        execute_db("DELETE FROM stars WHERE id = ?", (star_row['id'],))
-    
-    update_train_laps(kid_id) # Recalculate laps
+    if not stars_to_delete: return jsonify({"message": "No matching stars found to decrement."}), 404
+    for star_row in stars_to_delete: execute_db("DELETE FROM stars WHERE id = ?", (star_row['id'],))
+    update_train_laps(kid_id) 
     return jsonify({"message": f"{len(stars_to_delete)} star(s) decremented for kid {kid_id}."}), 200
 
 @app.route('/api/admin/kids/<int:kid_id>/train-config', methods=['PUT'])
 def admin_configure_train_track():
     if not check_admin_auth(): return jsonify({"error": "Unauthorized"}), 401
-    data = request.json
-    track_length = data.get('train_track_length')
+    data = request.json; track_length = data.get('train_track_length')
     try: track_length = int(track_length)
     except (ValueError, TypeError): return jsonify({"error": "Invalid track length"}), 400
     if track_length <= 0: return jsonify({"error": "Track length must be positive"}), 400
-
     execute_db("UPDATE kids SET train_track_length = ? WHERE id = ?", (track_length, kid_id))
-    update_train_laps(kid_id) # Recalculate laps with new track length
+    update_train_laps(kid_id) 
     return jsonify({"message": f"Train track length for kid {kid_id} updated to {track_length}."}), 200
 
 # --- CLI command to initialize DB ---
 @app.cli.command('initdb')
 def initdb_command():
-    db = get_db()
-    db.cursor().executescript(SCHEMA_SQL)
-    db.commit()
-    print('Initialized the database with schema string.')
+    """Initializes the database using 'flask initdb' command."""
+    # This uses the absolute path for database creation via CLI
+    db_path = os.path.join(app.root_path, DATABASE)
+    db_dir = os.path.dirname(db_path)
+    if not os.path.exists(db_dir):
+        os.makedirs(db_dir)
+    
+    # Connect to the database (which creates the file if it doesn't exist)
+    # and then execute the schema.
+    with sqlite3.connect(db_path) as conn:
+        conn.executescript(SCHEMA_SQL)
+    print(f'Initialized the database at {db_path} with schema string.')
+
 
 if __name__ == '__main__':
-    if not os.path.exists(DATABASE):
-        print(f"Database {DATABASE} not found. Initializing...")
-        with app.app_context():
-            db = get_db()
-            db.cursor().executescript(SCHEMA_SQL)
-            db.commit()
-            print("Database initialized.")
+    # This block runs when the script is executed directly (e.g., python app.py)
+    # It ensures the data directory exists and initializes the DB if it's not found.
+    
+    # Construct the absolute path to the database file for the __main__ block
+    # app.root_path might not be fully configured here if not in an app context yet,
+    # so using os.getcwd() or a predefined absolute path might be more reliable
+    # if running `python app.py` directly without Flask's context.
+    # However, for Gunicorn, app.root_path in get_db() will be correct.
+    
+    # For simplicity and consistency with get_db(), we'll create the directory
+    # and initialize the DB within an app_context if running directly.
+    with app.app_context(): # Ensures app.root_path is available
+        db_full_path = os.path.join(app.root_path, DATABASE)
+        db_directory = os.path.dirname(db_full_path)
+
+        if not os.path.exists(db_directory):
+            try:
+                os.makedirs(db_directory)
+                print(f"Created database directory for __main__: {db_directory}")
+            except OSError as e:
+                print(f"Error creating database directory {db_directory} in __main__: {e}")
+                # Handle error or exit
+        
+        if not os.path.exists(db_full_path):
+            print(f"Database {db_full_path} not found. Initializing...")
+            # Use get_db() which handles connection and then execute schema
+            db_conn = get_db() # Establishes connection and g.database
+            db_conn.cursor().executescript(SCHEMA_SQL)
+            db_conn.commit()
+            # No need to close here, teardown_appcontext will handle it.
+            print("Database initialized on startup.")
+    
     app.run(host='0.0.0.0', port=5000, debug=True)
