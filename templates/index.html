@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
+    <meta charset="UTF-8"> 
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Super Chore Chart V3! - Edit Mode</title>
     <script src="https://cdn.tailwindcss.com"></script>
@@ -46,7 +46,8 @@
         <main class="flex-grow overflow-y-auto p-1 sm:p-2 -m-1 sm:-m-2 relative">
             <div id="kidSelectionView">
                 <h2 class="text-xl sm:text-2xl font-semibold text-slate-600 mb-4 text-center">Who are you?</h2>
-                <div id="kidList" class="grid grid-cols-1 gap-4"></div>
+                <div id="kidList" class="grid grid-cols-1 gap-4">
+                    </div>
                 <p id="noKidsMessage" class="text-center text-slate-500 mt-6">Admin needs to add kids first!</p>
             </div>
 
@@ -62,7 +63,8 @@
                     </div>
                 </div>
                 <h3 class="text-lg sm:text-xl font-semibold text-slate-600 my-2 sm:my-3">Today's Chores: <span id="currentDateDisplay"></span></h3>
-                <div id="choresForKidList" class="space-y-2 sm:space-y-3"></div>
+                <div id="choresForKidList" class="space-y-2 sm:space-y-3">
+                    </div>
                 <p id="noChoresForKidMessage" class="text-center text-slate-500 mt-6">No chores assigned for today, yay!</p>
                 <p id="allChoresDoneMessage" class="text-center text-green-600 font-semibold text-lg sm:text-xl mt-6 hidden">🎉 All chores done for today! Great job! 🎉</p>
             </div>
@@ -74,7 +76,8 @@
                         <input type="number" id="newKidTrainTrackLength" placeholder="Track Segments (e.g., 10)" class="p-2 border rounded-lg w-full sm:w-48 shadow-sm focus:ring-2 focus:ring-sky-500 outline-none text-sm sm:text-base" min="1" value="10">
                         <button id="addKidButton" class="px-3 py-2 sm:px-4 text-sm sm:text-base bg-green-500 hover:bg-green-600 text-white rounded-lg shadow transition-colors">Add Kid</button>
                     </div>
-                    <div id="adminKidList" class="space-y-3"></div>
+                    <div id="adminKidList" class="space-y-3">
+                        </div>
                 </div>
 
                 <div> <h2 class="text-xl sm:text-2xl font-semibold text-slate-600 mb-3 border-b pb-2">Manage Master Chores</h2>
@@ -83,7 +86,8 @@
                         <input type="text" id="newChoreIcon" placeholder="Icon (e.g., 🛏️)" class="p-2 border rounded-lg w-full sm:w-24 shadow-sm focus:ring-2 focus:ring-sky-500 outline-none text-sm sm:text-base">
                         <button id="addMasterChoreButton" class="px-3 py-2 sm:px-4 text-sm sm:text-base bg-green-500 hover:bg-green-600 text-white rounded-lg shadow transition-colors">Add Chore</button>
                     </div>
-                    <ul id="masterChoreListDisplay" class="space-y-1 text-sm sm:text-base"></ul>
+                    <ul id="masterChoreListDisplay" class="space-y-1 text-sm sm:text-base">
+                        </ul>
                 </div>
 
                 <div> <h2 class="text-xl sm:text-2xl font-semibold text-slate-600 mb-3 border-b pb-2">Assign Chores</h2>
@@ -110,7 +114,8 @@
                         <button id="assignChoreButton" class="px-3 py-2 sm:px-4 text-sm sm:text-base bg-blue-500 hover:bg-blue-600 text-white rounded-lg shadow transition-colors h-10">Assign</button>
                     </div>
                     <h3 class="text-md sm:text-lg font-semibold text-slate-600 mt-4 mb-2">Current Assignments:</h3>
-                    <div id="currentAssignmentsList" class="space-y-1.5 sm:space-y-2 text-xs sm:text-sm text-slate-700 max-h-32 sm:max-h-48 overflow-y-auto"></div>
+                    <div id="currentAssignmentsList" class="space-y-1.5 sm:space-y-2 text-xs sm:text-sm text-slate-700 max-h-32 sm:max-h-48 overflow-y-auto">
+                        </div>
                 </div>
 
                 <div> <h2 class="text-xl sm:text-2xl font-semibold text-slate-600 mb-3 border-b pb-2">Bonus Stars</h2>
@@ -120,8 +125,7 @@
                         <button id="awardBonusStarButton" class="px-3 py-2 sm:px-4 text-sm sm:text-base bg-yellow-400 hover:bg-yellow-500 text-slate-800 rounded-lg shadow transition-colors w-full sm:w-auto">Award Bonus Star</button>
                     </div>
                 </div>
-            </div>
-        </main>
+            </div> </main>
 
         <div id="adminLoginModal" class="admin-login-modal">
             <div class="bg-white p-6 sm:p-8 rounded-lg shadow-xl w-full max-w-xs sm:max-w-sm text-center">
@@ -202,7 +206,6 @@
         const adminPasswordInput = document.getElementById('adminPasswordInput');
         const adminLoginSubmitButton = document.getElementById('adminLoginSubmitButton');
         const adminLoginCancelButton = document.getElementById('adminLoginCancelButton');
-        // Edit Assignment Modal Elements
         const editAssignmentModal = document.getElementById('editAssignmentModal');
         const editingAssignmentIdInput = document.getElementById('editingAssignmentId');
         const editAssignmentFrequencySelect = document.getElementById('editAssignmentFrequencySelect');
@@ -215,10 +218,11 @@
         let currentView = 'kidSelection';
         let adminPassword = null; 
         const KID_AVATAR_COLORS = ['bg-pink-500', 'bg-indigo-500', 'bg-emerald-500', 'bg-purple-500', 'bg-orange-500'];
-        let masterChoresDataCache = []; // Cache for master chores to populate edit selects
+        let masterChoresDataCache = []; 
 
         // --- API Helper ---
         async function apiCall(endpoint, method = 'GET', body = null, requiresAdmin = false) {
+            console.log(`API Call: ${method} ${endpoint}`, body); 
             const headers = { 'Content-Type': 'application/json' };
             if (requiresAdmin && adminPassword) {
                 headers['X-Admin-Password'] = adminPassword;
@@ -227,19 +231,21 @@
             if (body) options.body = JSON.stringify(body);
             try {
                 const response = await fetch(`/api${endpoint}`, options);
+                const responseData = response.status === 204 ? true : await response.json().catch(() => null); 
+                console.log(`API Response for ${method} ${endpoint}:`, { status: response.status, ok: response.ok, data: responseData }); 
+
                 if (!response.ok) {
-                    const errorData = await response.json().catch(() => ({ error: `HTTP error! Status: ${response.status}` }));
-                    console.error('API Error:', errorData.error, response.status);
-                    showModal(errorData.error || `Request failed: ${response.status}`);
+                    const errorMsg = responseData?.error || `Request failed: ${response.status}`;
+                    console.error('API Error:', errorMsg, response.status);
+                    showModal(errorMsg);
                     if (response.status === 401 && requiresAdmin) {
                         adminPassword = null; switchView('kidSelection'); showAdminLogin();
                     }
                     return null;
                 }
-                if (response.status === 204) return true; // No Content success
-                return await response.json();
+                return responseData;
             } catch (error) {
-                console.error('Fetch Error:', error);
+                console.error('Fetch Error for ' + endpoint + ':', error); 
                 showModal('Network error or server unavailable.');
                 return null;
             }
@@ -262,6 +268,7 @@
 
         // --- View Switching ---
         function switchView(viewName) {
+            console.log("Switching view to:", viewName); 
             currentView = viewName;
             [kidSelectionView, kidChoresView, adminView].forEach(v => v.classList.add('hidden'));
             kidSelectionButton.classList.add('hidden');
@@ -283,48 +290,75 @@
         function renderTrainTrack(kid) { /* ... (same as before) */ }
 
         // --- Rendering Functions ---
-        async function loadAndRenderKidSelectionView() { /* ... (same as before, uses renderTrainTrack) */ 
+        async function loadAndRenderKidSelectionView() {
+            console.log("loadAndRenderKidSelectionView called"); 
+            const kidListDivElement = document.getElementById('kidList');
+            if (!kidListDivElement) {
+                console.error("kidListDiv not found in DOM!"); 
+                return;
+            }
+            kidListDivElement.innerHTML = '<p class="text-center text-slate-500">Loading kids...</p>'; 
+
             const kids = await apiCall('/kids');
-            kidListDiv.innerHTML = '';
+            console.log("Kids data from API:", kids); 
+
+            kidListDivElement.innerHTML = ''; 
             if (!kids || kids.length === 0) {
-                noKidsMessage.classList.remove('hidden'); kidListDiv.classList.add('hidden');
+                console.log("No kids found or API call failed to return kids."); 
+                noKidsMessage.classList.remove('hidden'); 
+                kidListDivElement.classList.add('hidden'); 
             } else {
-                noKidsMessage.classList.add('hidden'); kidListDiv.classList.remove('hidden');
+                noKidsMessage.classList.add('hidden'); 
+                kidListDivElement.classList.remove('hidden'); 
                 kids.forEach(kid => {
+                    console.log("Rendering kid:", kid.name); 
                     const kidCard = document.createElement('div');
-                    kidCard.className = `p-3 sm:p-4 rounded-xl shadow-lg text-white cursor-pointer hover:scale-105 transition-transform ${kid.avatar_color || 'bg-sky-500'}`;
+                    const avatarColor = kid.avatar_color || 'bg-sky-500'; 
+                    kidCard.className = `p-3 sm:p-4 rounded-xl shadow-lg text-white cursor-pointer hover:scale-105 transition-transform ${avatarColor}`;
                     kidCard.onclick = () => { currentKidId = kid.id; switchView('kidChores'); };
+                    
                     const kidInfoDiv = document.createElement('div');
                     kidInfoDiv.className = 'flex items-center mb-2';
+                    
                     const avatar = document.createElement('div');
-                    avatar.className = `kid-avatar mr-3 ${kid.avatar_color || 'bg-sky-500'}`; 
-                    avatar.textContent = kid.name.charAt(0).toUpperCase();
+                    avatar.className = `kid-avatar mr-3 ${avatarColor}`; 
+                    avatar.textContent = kid.name ? kid.name.charAt(0).toUpperCase() : '?'; 
                     kidInfoDiv.appendChild(avatar);
+                    
                     const nameText = document.createElement('p');
                     nameText.className = 'text-lg sm:text-xl font-semibold';
-                    nameText.textContent = kid.name;
+                    nameText.textContent = kid.name || 'Unnamed Kid'; 
                     kidInfoDiv.appendChild(nameText);
                     kidCard.appendChild(kidInfoDiv);
-                    const trainTrackElement = renderTrainTrack(kid);
+
+                    const trainTrackElement = renderTrainTrack(kid); 
                     kidCard.appendChild(trainTrackElement);
-                    kidListDiv.appendChild(kidCard);
+                    kidListDivElement.appendChild(kidCard);
                 });
             }
         }
 
-        async function loadAndRenderKidChoresView(kidId) { /* ... (same as before) */ 
+        async function loadAndRenderKidChoresView(kidId) { 
+            console.log("loadAndRenderKidChoresView for kidId:", kidId); 
             if (!kidId) { switchView('kidSelection'); return; }
             const data = await apiCall(`/kids/${kidId}/chores-today`);
-            if (!data || !data.kid_info) { switchView('kidSelection'); return; }
+            if (!data || !data.kid_info) { 
+                console.error("Failed to load kid chore data or kid_info missing for kidId:", kidId); 
+                switchView('kidSelection'); return; 
+            }
             const { kid_info, chores } = data;
-            kidNameDisplay.textContent = kid_info.name;
-            kidChoresAvatar.className = `kid-avatar ${kid_info.avatar_color || 'bg-pink-500'} mr-3 sm:mr-4`;
-            kidChoresAvatar.textContent = kid_info.name.charAt(0).toUpperCase();
-            kidStarsDisplay.innerHTML = `⭐ ${kid_info.stars_count} Star${kid_info.stars_count === 1 ? '' : 's'}`;
-            kidBalloonsDisplay.innerHTML = `🎈 ${kid_info.balloons} Balloon${kid_info.balloons === 1 ? '' : 's'}`;
+            console.log("Kid chore data:", data); 
+
+            kidNameDisplay.textContent = kid_info.name || 'Kid';
+            const avatarColor = kid_info.avatar_color || 'bg-pink-500';
+            kidChoresAvatar.className = `kid-avatar ${avatarColor} mr-3 sm:mr-4`;
+            kidChoresAvatar.textContent = kid_info.name ? kid_info.name.charAt(0).toUpperCase() : '?';
+            kidStarsDisplay.innerHTML = `⭐ ${kid_info.stars_count || 0} Star${(kid_info.stars_count || 0) === 1 ? '' : 's'}`;
+            kidBalloonsDisplay.innerHTML = `🎈 ${kid_info.balloons || 0} Balloon${(kid_info.balloons || 0) === 1 ? '' : 's'}`;
             currentDateDisplay.textContent = new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' });
+            
             choresForKidList.innerHTML = '';
-            if (chores.length === 0) {
+            if (!chores || chores.length === 0) {
                 noChoresForKidMessage.classList.remove('hidden'); allChoresDoneMessage.classList.add('hidden');
             } else {
                 noChoresForKidMessage.classList.add('hidden');
@@ -332,13 +366,11 @@
                 chores.forEach(chore => {
                     const isCompleted = chore.completed_today;
                     const choreDiv = document.createElement('div');
-                    // chore.is_active is not directly available here, but backend filters.
-                    // If we wanted to show disabled chores differently, we'd need that info.
                     choreDiv.className = `chore-item flex items-center justify-between p-3 sm:p-4 bg-slate-100 rounded-lg shadow ${isCompleted ? 'completed' : ''}`;
                     choreDiv.innerHTML = `
                         <div class="flex items-center">
                             <span class="text-xl sm:text-2xl mr-2 sm:mr-3">${chore.chore_icon || '🔧'}</span>
-                            <span class="text-slate-700 text-sm sm:text-base">${chore.chore_name}</span>
+                            <span class="text-slate-700 text-sm sm:text-base">${chore.chore_name || 'Unnamed Chore'}</span>
                         </div>
                         <button data-assignment-id="${chore.assignment_id}" data-chore-id="${chore.chore_id}" 
                                 class="chore-action-btn px-3 py-1.5 sm:px-4 sm:py-2 rounded-lg text-white transition-colors text-xs sm:text-sm
@@ -353,13 +385,19 @@
             }
         }
 
-        async function loadAndRenderAdminView() {
+        async function loadAndRenderAdminView() { 
+            console.log("loadAndRenderAdminView called"); 
             const kids = await apiCall('/kids', 'GET', null, true);
-            masterChoresDataCache = await apiCall('/chores-master', 'GET', null, true) || []; // Update cache
+            masterChoresDataCache = await apiCall('/chores-master', 'GET', null, true) || []; 
             const assignments = await apiCall('/assignments', 'GET', null, true);
-            if (!kids || !masterChoresDataCache || !assignments) return;
+            
+            console.log("Admin data:", { kids, masterChores: masterChoresDataCache, assignments }); 
 
-            // Render Kids with Edit
+            if (!kids || !masterChoresDataCache || !assignments) {
+                console.error("Failed to load all necessary admin data."); 
+                return;
+            }
+            
             adminKidListDiv.innerHTML = '';
             let kidOptionsHTML = '<option value="all">All Kids</option>';
             kids.forEach(kid => {
@@ -372,12 +410,11 @@
                 kidItem.innerHTML = `
                     <div class="kid-display-mode">
                         <div class="flex justify-between items-center">
-                            <span class="font-semibold text-md sm:text-lg kid-name-display">${kid.name}</span>
-                            <span class="text-xs sm:text-sm">⭐ ${kid.stars_count} | 🎈 ${kid.balloons} | 🚂 Laps: ${kid.train_laps_completed} (Track: <span class="kid-track-length-display">${kid.train_track_length}</span>)</span>
+                            <span class="font-semibold text-md sm:text-lg kid-name-display">${kid.name || 'N/A'}</span>
+                            <span class="text-xs sm:text-sm">⭐ ${kid.stars_count || 0} | 🎈 ${kid.balloons || 0} | 🚂 Laps: ${kid.train_laps_completed || 0} (Track: <span class="kid-track-length-display">${kid.train_track_length || 10}</span>)</span>
                         </div>
                         <div class="flex flex-col sm:flex-row gap-2 items-center mt-1">
-                            <input type="number" value="${kid.train_track_length}" min="1" class="admin-kid-train-length p-1.5 border rounded-md w-full sm:w-24 text-xs sm:text-sm hidden" placeholder="Track Len">
-                            <button class="admin-edit-kid-btn px-2 py-1.5 text-xs sm:text-sm bg-blue-500 hover:bg-blue-600 text-white rounded-md w-full sm:w-auto">Edit Kid</button>
+                             <button class="admin-edit-kid-btn px-2 py-1.5 text-xs sm:text-sm bg-blue-500 hover:bg-blue-600 text-white rounded-md w-full sm:w-auto">Edit Kid</button>
                         </div>
                          <div class="grid grid-cols-2 sm:grid-cols-3 gap-2 mt-1">
                             <button class="admin-reset-chores-btn px-2 py-1.5 text-xs sm:text-sm bg-red-500 hover:bg-red-600 text-white rounded-md" data-kid-id="${kid.id}">Reset Day</button>
@@ -386,8 +423,8 @@
                         </div>
                     </div>
                     <div class="kid-edit-mode hidden space-y-2">
-                        <input type="text" value="${kid.name}" class="edit-kid-name-input p-2 border rounded-lg w-full shadow-sm text-sm sm:text-base">
-                        <input type="number" value="${kid.train_track_length}" min="1" class="edit-kid-track-input p-2 border rounded-lg w-full shadow-sm text-sm sm:text-base">
+                        <input type="text" value="${kid.name || ''}" class="edit-kid-name-input p-2 border rounded-lg w-full shadow-sm text-sm sm:text-base">
+                        <input type="number" value="${kid.train_track_length || 10}" min="1" class="edit-kid-track-input p-2 border rounded-lg w-full shadow-sm text-sm sm:text-base">
                         <div class="flex gap-2">
                             <button class="admin-save-kid-btn px-3 py-1.5 text-xs sm:text-sm bg-green-500 hover:bg-green-600 text-white rounded-md">Save</button>
                             <button class="admin-cancel-edit-kid-btn px-3 py-1.5 text-xs sm:text-sm bg-slate-400 hover:bg-slate-500 text-white rounded-md">Cancel</button>
@@ -395,12 +432,11 @@
                     </div>
                 `;
                 adminKidListDiv.appendChild(kidItem);
-                kidOptionsHTML += `<option value="${kid.id}">${kid.name}</option>`;
+                kidOptionsHTML += `<option value="${kid.id}">${kid.name || 'N/A'}</option>`;
             });
             assignKidSelect.innerHTML = kidOptionsHTML;
-            bonusKidSelect.innerHTML = kids.map(k => `<option value="${k.id}">${k.name}</option>`).join('');
+            bonusKidSelect.innerHTML = kids.map(k => `<option value="${k.id}">${k.name || 'N/A'}</option>`).join('');
 
-            // Render Master Chores with Edit
             masterChoreListDisplay.innerHTML = '';
             let choreOptionsHTML = '';
             masterChoresDataCache.forEach(chore => {
@@ -408,28 +444,28 @@
                 choreItem.className = 'p-1.5 bg-slate-50 rounded border border-slate-200 flex justify-between items-center chore-master-item';
                 choreItem.dataset.choreId = chore.id;
                 choreItem.dataset.originalName = chore.name;
-                choreItem.dataset.originalIcon = chore.icon || '';
+                choreItem.dataset.originalIcon = chore.icon || ''; 
                 choreItem.innerHTML = `
                     <div class="chore-master-display-mode">
-                        <span>${chore.icon || '🔧'} ${chore.name}</span>
+                        <span>${chore.icon || '🔧'} ${chore.name || 'N/A'}</span>
                         <button class="admin-edit-master-chore-btn ml-2 px-2 py-1 text-xs bg-blue-500 hover:bg-blue-600 text-white rounded-md">Edit</button>
                     </div>
                     <div class="chore-master-edit-mode hidden flex-grow items-center gap-2">
-                        <input type="text" value="${chore.name}" class="edit-master-chore-name-input p-1 border rounded-md flex-grow text-sm">
+                        <input type="text" value="${chore.name || ''}" class="edit-master-chore-name-input p-1 border rounded-md flex-grow text-sm">
                         <input type="text" value="${chore.icon || ''}" class="edit-master-chore-icon-input p-1 border rounded-md w-16 text-sm">
                         <button class="admin-save-master-chore-btn px-2 py-1 text-xs bg-green-500 text-white rounded-md">Save</button>
                         <button class="admin-cancel-edit-master-chore-btn px-2 py-1 text-xs bg-slate-400 text-white rounded-md">Cancel</button>
                     </div>
                 `;
                 masterChoreListDisplay.appendChild(choreItem);
-                choreOptionsHTML += `<option value="${chore.id}">${chore.name}</option>`;
+                choreOptionsHTML += `<option value="${chore.id}">${chore.name || 'N/A'}</option>`;
             });
             assignChoreSelect.innerHTML = choreOptionsHTML;
             
-            renderCurrentAssignments(assignments); // Render assignments with new edit/toggle buttons
+            renderCurrentAssignments(assignments);
         }
 
-        function renderCurrentAssignments(assignmentsData) {
+        function renderCurrentAssignments(assignmentsData) { 
             currentAssignmentsList.innerHTML = '';
             if (!assignmentsData || assignmentsData.length === 0) {
                 currentAssignmentsList.innerHTML = '<p class="text-slate-500">No chores assigned yet.</p>'; return;
@@ -440,8 +476,8 @@
                 div.className = `p-1.5 sm:p-2 bg-slate-50 rounded border border-slate-200 flex flex-col sm:flex-row justify-between items-start sm:items-center ${!isActive ? 'opacity-50' : ''}`;
                 div.innerHTML = `
                     <div>
-                        <span><strong>${assignment.kid_name}</strong> - ${assignment.chore_name}</span>
-                        <span class="block sm:inline sm:ml-2 text-slate-600 text-xs">(${assignment.frequency}) ${!isActive ? '[DISABLED]' : ''}</span>
+                        <span><strong>${assignment.kid_name || 'N/A'}</strong> - ${assignment.chore_name || 'N/A'}</span>
+                        <span class="block sm:inline sm:ml-2 text-slate-600 text-xs">(${assignment.frequency || 'N/A'}) ${!isActive ? '[DISABLED]' : ''}</span>
                     </div>
                     <div class="flex gap-1 sm:gap-2 mt-1 sm:mt-0">
                         <button data-assignment-id="${assignment.id}" data-current-frequency="${assignment.frequency}" class="admin-edit-assignment-btn px-2 py-1 text-xs bg-sky-500 hover:bg-sky-600 text-white rounded-md">Edit Freq</button>
@@ -452,125 +488,39 @@
                 currentAssignmentsList.appendChild(div);
             });
         }
+        function renderTrainTrack(kid) {
+            const container = document.createElement('div');
+            container.className = 'train-track-container';
+            const trackLength = kid.train_track_length || 10; 
+            const currentStars = kid.stars_count || 0; 
+            const trainPosition = trackLength > 0 ? currentStars % trackLength : 0;
+
+            for (let i = 0; i < trackLength; i++) {
+                const segment = document.createElement('div');
+                segment.className = 'track-segment';
+                if (i === trainPosition) {
+                    segment.classList.add('active');
+                    segment.innerHTML = '<span class="train-icon">🚂</span>';
+                } else {
+                    segment.classList.add('empty');
+                }
+                container.appendChild(segment);
+            }
+            const lapsDisplay = document.createElement('span');
+            lapsDisplay.className = 'laps-display';
+            lapsDisplay.textContent = `Laps: ${kid.train_laps_completed || 0}`; 
+            container.appendChild(lapsDisplay);
+            return container;
+        }
 
 
         // --- Event Handlers ---
-        adminLoginSubmitButton.onclick = () => { /* ... (same) */ };
-        adminLoginCancelButton.onclick = () => { /* ... (same) */ };
-        addKidButton.onclick = async () => { /* ... (same, ensure loadAndRenderAdminView is called) */ };
-        addMasterChoreButton.onclick = async () => { /* ... (same, ensure loadAndRenderAdminView is called) */ };
-        assignChoreButton.onclick = async () => { /* ... (same, ensure loadAndRenderAdminView is called) */ };
-        awardBonusStarButton.onclick = async () => { /* ... (same, ensure loadAndRenderAdminView and kid's view are called) */ };
-        choresForKidList.addEventListener('click', async (e) => { /* ... (same chore action logic) */ });
-        
-        // Edit Kid Logic
-        adminKidListDiv.addEventListener('click', async (e) => {
-            const kidItem = e.target.closest('.kid-admin-item');
-            if (!kidItem) return;
-            const kidId = kidItem.dataset.kidId;
-
-            if (e.target.classList.contains('admin-edit-kid-btn')) {
-                kidItem.querySelector('.kid-display-mode').classList.add('hidden');
-                kidItem.querySelector('.kid-edit-mode').classList.remove('hidden');
-            } else if (e.target.classList.contains('admin-cancel-edit-kid-btn')) {
-                kidItem.querySelector('.kid-display-mode').classList.remove('hidden');
-                kidItem.querySelector('.kid-edit-mode').classList.add('hidden');
-                // Reset input fields to original values
-                kidItem.querySelector('.edit-kid-name-input').value = kidItem.dataset.originalName;
-                kidItem.querySelector('.edit-kid-track-input').value = kidItem.dataset.originalTrackLength;
-            } else if (e.target.classList.contains('admin-save-kid-btn')) {
-                const newName = kidItem.querySelector('.edit-kid-name-input').value.trim();
-                const newTrackLength = parseInt(kidItem.querySelector('.edit-kid-track-input').value);
-                if (newName && newTrackLength > 0) {
-                    const result = await apiCall(`/kids/${kidId}`, 'PUT', { name: newName, train_track_length: newTrackLength }, true);
-                    if (result) {
-                        showModal('Kid updated successfully!');
-                        loadAndRenderAdminView(); // Reload to reflect changes and exit edit mode
-                        if (currentView === 'kidChores' && currentKidId == kidId) loadAndRenderKidChoresView(kidId); // Refresh kid view if active
-                    }
-                } else { showModal('Valid name and positive track length required.'); }
-            }
-            // Other admin buttons for kid (reset, decrement) - ensure they use kidId from kidItem.dataset.kidId
-            else if (e.target.classList.contains('admin-reset-chores-btn')) { /* ... (same as before, use kidId) */ }
-            else if (e.target.classList.contains('admin-decrement-balloons-btn')) { /* ... (same as before, use kidId) */ }
-            else if (e.target.classList.contains('admin-decrement-stars-btn')) { /* ... (same as before, use kidId) */ }
-        });
-
-        // Edit Master Chore Logic
-        masterChoreListDisplay.addEventListener('click', async (e) => {
-            const choreItem = e.target.closest('.chore-master-item');
-            if (!choreItem) return;
-            const choreId = choreItem.dataset.choreId;
-
-            if (e.target.classList.contains('admin-edit-master-chore-btn')) {
-                choreItem.querySelector('.chore-master-display-mode').classList.add('hidden');
-                choreItem.querySelector('.chore-master-edit-mode').classList.remove('hidden');
-            } else if (e.target.classList.contains('admin-cancel-edit-master-chore-btn')) {
-                choreItem.querySelector('.chore-master-display-mode').classList.remove('hidden');
-                choreItem.querySelector('.chore-master-edit-mode').classList.add('hidden');
-                choreItem.querySelector('.edit-master-chore-name-input').value = choreItem.dataset.originalName;
-                choreItem.querySelector('.edit-master-chore-icon-input').value = choreItem.dataset.originalIcon;
-            } else if (e.target.classList.contains('admin-save-master-chore-btn')) {
-                const newName = choreItem.querySelector('.edit-master-chore-name-input').value.trim();
-                const newIcon = choreItem.querySelector('.edit-master-chore-icon-input').value.trim();
-                if (newName) {
-                    const result = await apiCall(`/chores-master/${choreId}`, 'PUT', { name: newName, icon: newIcon }, true);
-                    if (result) {
-                        showModal('Master chore updated!');
-                        loadAndRenderAdminView(); // Reload
-                    }
-                } else { showModal('Chore name cannot be empty.'); }
-            }
-        });
-        
-        // Edit/Toggle/Remove Assignment Logic
-        currentAssignmentsList.addEventListener('click', async (e) => {
-            const assignmentId = e.target.dataset.assignmentId;
-            if (!assignmentId) return;
-
-            if (e.target.classList.contains('remove-assignment-btn')) {
-                if (confirm('Are you sure you want to remove this assignment?')) {
-                    if (await apiCall(`/assignments/${assignmentId}`, 'DELETE', null, true)) {
-                        loadAndRenderAdminView(); showModal('Assignment removed.');
-                    }
-                }
-            } else if (e.target.classList.contains('admin-toggle-assignment-active-btn')) {
-                const result = await apiCall(`/assignments/${assignmentId}/toggle-active`, 'POST', null, true);
-                if (result) {
-                    showModal(result.message);
-                    loadAndRenderAdminView(); // Refresh the list to show new status
-                }
-            } else if (e.target.classList.contains('admin-edit-assignment-btn')) {
-                const currentFrequency = e.target.dataset.currentFrequency;
-                showEditAssignmentModal(assignmentId, currentFrequency);
-            }
-        });
-
-        editAssignmentSaveButton.onclick = async () => {
-            const assignmentId = editingAssignmentIdInput.value;
-            const newFrequency = editAssignmentFrequencySelect.value;
-            if (assignmentId && newFrequency) {
-                const result = await apiCall(`/assignments/${assignmentId}/edit`, 'PUT', { frequency: newFrequency }, true);
-                if (result) {
-                    showModal(result.message);
-                    hideEditAssignmentModal();
-                    loadAndRenderAdminView();
-                }
-            }
+        adminLoginSubmitButton.onclick = () => {
+            const pwd = adminPasswordInput.value; if (!pwd) { showModal("Please enter admin password."); return; }
+            adminPassword = pwd; hideAdminLogin(); switchView('admin');
         };
-        editAssignmentCancelButton.onclick = hideEditAssignmentModal;
+        adminLoginCancelButton.onclick = hideAdminLogin;
 
-
-        // --- Navigation & Initial Load ---
-        adminModeButton.onclick = () => switchView('admin');
-        kidSelectionButton.onclick = () => { currentKidId = null; switchView('kidSelection'); };
-        modalCloseButton.onclick = hideModal;
-        document.addEventListener('DOMContentLoaded', () => {
-            currentDateDisplay.textContent = new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' });
-            switchView('kidSelection');
-        });
-
-        // Fill in the blanks for event handlers that were previously shortened
         addKidButton.onclick = async () => {
             const name = newKidNameInput.value.trim();
             const trackLength = parseInt(newKidTrainTrackLengthInput.value) || 10;
@@ -609,6 +559,8 @@
                 showModal(result.message || 'Bonus star awarded!'); bonusReasonInput.value = '';
             }
         };
+        
+        // Kid's Chore Action (Mark Done / Undo)
         choresForKidList.addEventListener('click', async (e) => {
             const button = e.target.closest('.chore-action-btn');
             if (button) {
@@ -624,21 +576,130 @@
                 }
                 if (result) {
                     loadAndRenderKidChoresView(currentKidId); 
-                    if (result.daily_star_awarded) showModal("Great job! You earned a daily star! ⭐");
-                    else if (result.stars_from_balloons > 0) showModal(`Wow! You converted balloons into ${result.stars_from_balloons} star(s)! ⭐`);
-                    else if (result.daily_star_revoked) showModal("Daily star was un-earned.");
-                    else if (result.star_from_balloons_revoked) showModal("Balloon-star was un-earned and balloons returned.");
-                    else if (result.message) showModal(result.message);
+                    // Only show modal for significant events, not every chore completion
+                    if (result.daily_star_awarded) {
+                        showModal("Great job! You earned a daily star! ⭐");
+                    } else if (result.stars_from_balloons > 0) {
+                        showModal(`Wow! You converted balloons into ${result.stars_from_balloons} star(s)! ⭐`);
+                    } else if (result.daily_star_revoked) {
+                        showModal("Daily star was un-earned.");
+                    } else if (result.star_from_balloons_revoked) {
+                        showModal("Balloon-star was un-earned and balloons returned.");
+                    } else if (isCompleted && result.message) { // Show message on undo if one is provided
+                         showModal(result.message);
+                    }
+                    // The generic "Chore marked complete!" message is now suppressed unless it's a special case above.
                 }
             }
         });
-        adminLoginSubmitButton.onclick = () => {
-            const pwd = adminPasswordInput.value; if (!pwd) { showModal("Please enter admin password."); return; }
-            adminPassword = pwd; hideAdminLogin(); switchView('admin');
+        
+        adminKidListDiv.addEventListener('click', async (e) => {
+            const kidItem = e.target.closest('.kid-admin-item');
+            if (!kidItem) return;
+            const kidId = kidItem.dataset.kidId;
+
+            if (e.target.classList.contains('admin-edit-kid-btn')) {
+                kidItem.querySelector('.kid-display-mode').classList.add('hidden');
+                kidItem.querySelector('.kid-edit-mode').classList.remove('hidden');
+            } else if (e.target.classList.contains('admin-cancel-edit-kid-btn')) {
+                kidItem.querySelector('.kid-display-mode').classList.remove('hidden');
+                kidItem.querySelector('.kid-edit-mode').classList.add('hidden');
+                kidItem.querySelector('.edit-kid-name-input').value = kidItem.dataset.originalName;
+                kidItem.querySelector('.edit-kid-track-input').value = kidItem.dataset.originalTrackLength;
+            } else if (e.target.classList.contains('admin-save-kid-btn')) {
+                const newName = kidItem.querySelector('.edit-kid-name-input').value.trim();
+                const newTrackLength = parseInt(kidItem.querySelector('.edit-kid-track-input').value);
+                if (newName && newTrackLength > 0) {
+                    const result = await apiCall(`/kids/${kidId}`, 'PUT', { name: newName, train_track_length: newTrackLength }, true);
+                    if (result) {
+                        showModal('Kid updated successfully!');
+                        loadAndRenderAdminView(); 
+                        if (currentView === 'kidChores' && currentKidId == kidId) loadAndRenderKidChoresView(kidId); 
+                    }
+                } else { showModal('Valid name and positive track length required.'); }
+            }
+            else if (e.target.classList.contains('admin-reset-chores-btn')) { 
+                if (confirm(`Reset all of today's chores for this kid?`)) {
+                    const result = await apiCall(`/admin/kids/${kidId}/reset-daily-chores`, 'POST', null, true);
+                    if (result) { showModal(result.message); loadAndRenderAdminView(); if(currentKidId == kidId && currentView == 'kidChores') loadAndRenderKidChoresView(kidId); }
+                }
+            } 
+            else if (e.target.classList.contains('admin-decrement-balloons-btn')) { 
+                 const numToDecrement = parseInt(prompt("How many balloons to decrement?", "1")) || 0;
+                 if (numToDecrement > 0) {
+                    const result = await apiCall(`/admin/kids/${kidId}/decrement-balloons`, 'POST', { count: numToDecrement }, true);
+                    if (result) { showModal(result.message); loadAndRenderAdminView(); if(currentKidId == kidId && currentView == 'kidChores') loadAndRenderKidChoresView(kidId); }
+                 }
+            } 
+            else if (e.target.classList.contains('admin-decrement-stars-btn')) { 
+                const numToDecrement = parseInt(prompt("How many stars to decrement?", "1")) || 0;
+                if (numToDecrement > 0) {
+                    const result = await apiCall(`/admin/kids/${kidId}/decrement-stars`, 'POST', { count: numToDecrement, type: 'any' }, true);
+                    if (result) { showModal(result.message); loadAndRenderAdminView(); if(currentKidId == kidId && currentView == 'kidChores') loadAndRenderKidChoresView(kidId); }
+                }
+            }
+        });
+
+        masterChoreListDisplay.addEventListener('click', async (e) => {
+            const choreItem = e.target.closest('.chore-master-item');
+            if (!choreItem) return;
+            const choreId = choreItem.dataset.choreId;
+            if (e.target.classList.contains('admin-edit-master-chore-btn')) {
+                choreItem.querySelector('.chore-master-display-mode').classList.add('hidden');
+                choreItem.querySelector('.chore-master-edit-mode').classList.remove('hidden');
+            } else if (e.target.classList.contains('admin-cancel-edit-master-chore-btn')) {
+                choreItem.querySelector('.chore-master-display-mode').classList.remove('hidden');
+                choreItem.querySelector('.chore-master-edit-mode').classList.add('hidden');
+                choreItem.querySelector('.edit-master-chore-name-input').value = choreItem.dataset.originalName;
+                choreItem.querySelector('.edit-master-chore-icon-input').value = choreItem.dataset.originalIcon;
+            } else if (e.target.classList.contains('admin-save-master-chore-btn')) {
+                const newName = choreItem.querySelector('.edit-master-chore-name-input').value.trim();
+                const newIcon = choreItem.querySelector('.edit-master-chore-icon-input').value.trim();
+                if (newName) {
+                    const result = await apiCall(`/chores-master/${choreId}`, 'PUT', { name: newName, icon: newIcon }, true);
+                    if (result) { showModal('Master chore updated!'); loadAndRenderAdminView(); }
+                } else { showModal('Chore name cannot be empty.'); }
+            }
+        });
+        
+        currentAssignmentsList.addEventListener('click', async (e) => {
+            const assignmentId = e.target.dataset.assignmentId;
+            if (!assignmentId) return;
+            if (e.target.classList.contains('remove-assignment-btn')) {
+                if (confirm('Are you sure you want to remove this assignment?')) {
+                    if (await apiCall(`/assignments/${assignmentId}`, 'DELETE', null, true)) {
+                        loadAndRenderAdminView(); showModal('Assignment removed.');
+                    }
+                }
+            } else if (e.target.classList.contains('admin-toggle-assignment-active-btn')) {
+                const result = await apiCall(`/assignments/${assignmentId}/toggle-active`, 'POST', null, true);
+                if (result) { showModal(result.message); loadAndRenderAdminView(); }
+            } else if (e.target.classList.contains('admin-edit-assignment-btn')) {
+                const currentFrequency = e.target.dataset.currentFrequency;
+                showEditAssignmentModal(assignmentId, currentFrequency);
+            }
+        });
+
+        editAssignmentSaveButton.onclick = async () => {
+            const assignmentId = editingAssignmentIdInput.value;
+            const newFrequency = editAssignmentFrequencySelect.value;
+            if (assignmentId && newFrequency) {
+                const result = await apiCall(`/assignments/${assignmentId}/edit`, 'PUT', { frequency: newFrequency }, true);
+                if (result) {
+                    showModal(result.message); hideEditAssignmentModal(); loadAndRenderAdminView();
+                }
+            }
         };
-        adminLoginCancelButton.onclick = hideAdminLogin;
+        editAssignmentCancelButton.onclick = hideEditAssignmentModal;
 
-
+        adminModeButton.onclick = () => switchView('admin');
+        kidSelectionButton.onclick = () => { currentKidId = null; switchView('kidSelection'); };
+        modalCloseButton.onclick = hideModal;
+        document.addEventListener('DOMContentLoaded', () => {
+            console.log("DOM Content Loaded. Initializing app."); 
+            currentDateDisplay.textContent = new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' });
+            switchView('kidSelection');
+        });
     </script>
 </body>
 </html>
