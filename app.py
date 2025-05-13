@@ -40,17 +40,6 @@ def get_db():
             print(f"Error creating database directory {db_dir}: {e}")
             raise
 
-    # Check if the database file exists. If not, it needs to be created and schema initialized.
-    # This check is done outside the g._database check to ensure it happens once per app startup effectively.
-    # A more sophisticated approach for multi-worker Gunicorn might use a lock file or a dedicated init step,
-    # but for SQLite, this should generally be safe as file creation is atomic.
-    # The main risk is multiple workers trying to initialize schema simultaneously,
-    # but DROP TABLE IF EXISTS makes it idempotent.
-    
-    # To ensure schema is initialized only once if db file is missing:
-    # We will connect first, then check if tables exist, or rely on DROP IF EXISTS.
-    # A simpler way for this setup is to check file existence before the first connection in a worker.
-
     db_needs_init = not os.path.exists(db_path)
 
     db = getattr(g, '_database', None)
@@ -63,13 +52,9 @@ def get_db():
 
             if db_needs_init:
                 print(f"Database file did not exist. Initializing schema...")
-                init_db_schema(db) # Pass the connection object
+                init_db_schema(db) 
             else:
-                # Optional: Check if tables exist if db_needs_init was false but tables are missing (e.g. corrupted db)
-                # For simplicity, we are currently relying on DROP IF EXISTS in SCHEMA_SQL for resets via flask initdb
                 pass
-
-
         except sqlite3.Error as e:
             print(f"Error connecting to or initializing database {db_path}: {e}")
             raise 
@@ -90,6 +75,11 @@ def query_db(query, args=(), one=False):
 def execute_db(query, args=()):
     db = get_db()
     cur = db.cursor()
+    # For DELETE operations, ensure foreign key constraints are enabled for this connection
+    # if they are not enabled by default by the SQLite version/build.
+    # However, `ON DELETE CASCADE` in schema should handle it if DB supports it.
+    # For safety, one might execute `PRAGMA foreign_keys = ON;` once per connection.
+    # But usually, it's enabled by default or handled by the schema correctly.
     cur.execute(query, args)
     db.commit()
     last_row_id = cur.lastrowid
@@ -121,7 +111,7 @@ CREATE TABLE chore_assignments (
     kid_id INTEGER,
     chore_id INTEGER,
     frequency TEXT NOT NULL,
-    is_active BOOLEAN DEFAULT 1, -- Default to active
+    is_active BOOLEAN DEFAULT 1, 
     FOREIGN KEY (kid_id) REFERENCES kids (id) ON DELETE CASCADE,
     FOREIGN KEY (chore_id) REFERENCES chores_master (id) ON DELETE CASCADE
 );
@@ -132,7 +122,7 @@ CREATE TABLE chore_completions (
     assignment_id INTEGER,
     kid_id INTEGER NOT NULL,
     chore_id INTEGER NOT NULL,
-    date_completed TEXT NOT NULL, --YYYY-MM-DD
+    date_completed TEXT NOT NULL, 
     completed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (kid_id) REFERENCES kids (id) ON DELETE CASCADE,
     FOREIGN KEY (chore_id) REFERENCES chores_master (id) ON DELETE CASCADE,
@@ -143,8 +133,8 @@ DROP TABLE IF EXISTS stars;
 CREATE TABLE stars (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     kid_id INTEGER NOT NULL,
-    date_awarded TEXT NOT NULL, --YYYY-MM-DD
-    type TEXT NOT NULL, -- 'daily', 'bonus', 'balloon_conversion'
+    date_awarded TEXT NOT NULL, 
+    type TEXT NOT NULL, 
     reason TEXT,
     FOREIGN KEY (kid_id) REFERENCES kids (id) ON DELETE CASCADE
 );
@@ -200,9 +190,22 @@ def update_kid(kid_id):
         return jsonify({"error": "Valid positive train track length is required"}), 400
 
     execute_db("UPDATE kids SET name = ?, train_track_length = ? WHERE id = ?", (name.strip(), track_length, kid_id))
-    update_train_laps(kid_id) # Recalculate laps if track length changed
+    update_train_laps(kid_id) 
     updated_kid = query_db("SELECT k.id, k.name, k.avatar_color, k.balloons, k.train_track_length, k.train_laps_completed, COUNT(s.id) as stars_count FROM kids k LEFT JOIN stars s ON k.id = s.kid_id WHERE k.id = ? GROUP BY k.id", (kid_id,), one=True)
     return jsonify(dict(updated_kid)), 200
+
+@app.route('/api/kids/<int:kid_id>', methods=['DELETE'])
+def delete_kid(kid_id):
+    if not check_admin_auth(): return jsonify({"error": "Unauthorized"}), 401
+    
+    kid_exists = query_db("SELECT id FROM kids WHERE id = ?", (kid_id,), one=True)
+    if not kid_exists:
+        return jsonify({"error": "Kid not found"}), 404
+
+    # ON DELETE CASCADE in schema should handle related deletions in:
+    # chore_assignments, chore_completions, stars
+    execute_db("DELETE FROM kids WHERE id = ?", (kid_id,))
+    return jsonify({"message": f"Kid {kid_id} and all associated data deleted successfully."}), 200
 
 
 # --- Master Chores API ---
@@ -224,7 +227,7 @@ def update_master_chore(chore_id):
     if not check_admin_auth(): return jsonify({"error": "Unauthorized"}), 401
     data = request.json
     name = data.get('name')
-    icon = data.get('icon', '') # Default to empty string if not provided
+    icon = data.get('icon', '') 
 
     if not name or not isinstance(name, str) or not name.strip():
         return jsonify({"error": "Valid chore name is required"}), 400
@@ -457,15 +460,11 @@ def initdb_command():
     db_path = os.path.join(app.root_path, DATABASE)
     db_dir = os.path.dirname(db_path)
     if not os.path.exists(db_dir): os.makedirs(db_dir)
-    # For CLI init, we explicitly want to drop and recreate.
-    # So, we connect and then run the schema.
     with sqlite3.connect(db_path) as conn:
         print(f"Initializing DB at {db_path} via flask initdb command (will drop existing tables)...")
-        init_db_schema(conn) # Use the helper
+        init_db_schema(conn) 
     print(f'Initialized the database at {db_path} with schema string.')
 
-# This __main__ block is for running with `python app.py` (Flask dev server)
-# Gunicorn will not execute this block.
 if __name__ == '__main__':
     with app.app_context(): 
         db_full_path = os.path.join(app.root_path, DATABASE)
@@ -473,14 +472,10 @@ if __name__ == '__main__':
         if not os.path.exists(db_directory):
             try: os.makedirs(db_directory); print(f"Created database directory for __main__: {db_directory}")
             except OSError as e: print(f"Error creating database directory {db_directory} in __main__: {e}")
-        
-        # Check if DB file needs schema initialization when running with `python app.py`
         if not os.path.exists(db_full_path):
             print(f"Database {db_full_path} not found. Initializing for `python app.py`...")
-            # Need a connection to initialize schema
             temp_conn_for_init = sqlite3.connect(db_full_path)
             init_db_schema(temp_conn_for_init)
             temp_conn_for_init.close()
             print("Database initialized on startup for `python app.py`.")
-    
     app.run(host='0.0.0.0', port=5000, debug=True)
