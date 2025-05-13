@@ -17,9 +17,21 @@ ADMIN_PASSWORD = os.environ.get('ADMIN_PASSWORD', 'supersecret')
 BALLOONS_PER_STAR = 10
 
 # --- Database Setup & Helpers ---
+def init_db_schema(db_conn):
+    """Initializes the database with the schema."""
+    try:
+        print(f"Executing schema on database connection...")
+        db_conn.cursor().executescript(SCHEMA_SQL)
+        db_conn.commit()
+        print("Database schema initialized successfully.")
+    except sqlite3.Error as e:
+        print(f"Error initializing database schema: {e}")
+        raise
+
 def get_db():
     db_path = os.path.join(app.root_path, DATABASE)
     db_dir = os.path.dirname(db_path)
+
     if not os.path.exists(db_dir):
         try:
             os.makedirs(db_dir)
@@ -27,14 +39,39 @@ def get_db():
         except OSError as e:
             print(f"Error creating database directory {db_dir}: {e}")
             raise
+
+    # Check if the database file exists. If not, it needs to be created and schema initialized.
+    # This check is done outside the g._database check to ensure it happens once per app startup effectively.
+    # A more sophisticated approach for multi-worker Gunicorn might use a lock file or a dedicated init step,
+    # but for SQLite, this should generally be safe as file creation is atomic.
+    # The main risk is multiple workers trying to initialize schema simultaneously,
+    # but DROP TABLE IF EXISTS makes it idempotent.
+    
+    # To ensure schema is initialized only once if db file is missing:
+    # We will connect first, then check if tables exist, or rely on DROP IF EXISTS.
+    # A simpler way for this setup is to check file existence before the first connection in a worker.
+
+    db_needs_init = not os.path.exists(db_path)
+
     db = getattr(g, '_database', None)
     if db is None:
         try:
+            print(f"Connecting to database: {db_path}")
             db = g._database = sqlite3.connect(db_path)
             db.row_factory = sqlite3.Row 
             print(f"Successfully connected to database: {db_path}")
+
+            if db_needs_init:
+                print(f"Database file did not exist. Initializing schema...")
+                init_db_schema(db) # Pass the connection object
+            else:
+                # Optional: Check if tables exist if db_needs_init was false but tables are missing (e.g. corrupted db)
+                # For simplicity, we are currently relying on DROP IF EXISTS in SCHEMA_SQL for resets via flask initdb
+                pass
+
+
         except sqlite3.Error as e:
-            print(f"Error connecting to database {db_path}: {e}")
+            print(f"Error connecting to or initializing database {db_path}: {e}")
             raise 
     return db
 
@@ -199,8 +236,6 @@ def update_master_chore(chore_id):
 # --- Chore Assignments API ---
 @app.route('/api/assignments', methods=['GET'])
 def get_assignments():
-    # Fetch all assignments, joining with kid and chore names for display
-    # Also include is_active status
     sql = """
         SELECT ca.id, ca.kid_id, k.name as kid_name, ca.chore_id, 
                cm.name as chore_name, cm.icon as chore_icon, ca.frequency, ca.is_active
@@ -227,7 +262,7 @@ def add_assignment():
     if not kids_to_assign: return jsonify({"error": "No kids found to assign chores to."}), 400
     for k_id in kids_to_assign:
         existing = query_db("SELECT id FROM chore_assignments WHERE kid_id = ? AND chore_id = ? AND frequency = ?", (k_id, chore_id, frequency), one=True)
-        if not existing: # Add is_active=1 by default
+        if not existing: 
             assignment_id = execute_db("INSERT INTO chore_assignments (kid_id, chore_id, frequency, is_active) VALUES (?, ?, ?, 1)", (k_id, chore_id, frequency))
             assigned_ids.append(assignment_id)
     if not assigned_ids: return jsonify({"message": "Chores already assigned or no new assignments made."}), 200
@@ -244,10 +279,8 @@ def edit_assignment(assignment_id):
     if not check_admin_auth(): return jsonify({"error": "Unauthorized"}), 401
     data = request.json
     new_frequency = data.get('frequency')
-    
-    if not new_frequency: # Add more validation for frequency values if needed
+    if not new_frequency: 
         return jsonify({"error": "Frequency is required"}), 400
-        
     execute_db("UPDATE chore_assignments SET frequency = ? WHERE id = ?", (new_frequency, assignment_id))
     return jsonify({"message": "Assignment frequency updated."}), 200
 
@@ -257,7 +290,6 @@ def toggle_assignment_active(assignment_id):
     assignment = query_db("SELECT is_active FROM chore_assignments WHERE id = ?", (assignment_id,), one=True)
     if not assignment:
         return jsonify({"error": "Assignment not found"}), 404
-    
     new_status = not assignment['is_active']
     execute_db("UPDATE chore_assignments SET is_active = ? WHERE id = ?", (new_status, assignment_id))
     return jsonify({"message": f"Assignment {'activated' if new_status else 'deactivated'}.", "is_active": new_status}), 200
@@ -272,7 +304,7 @@ def get_chores_for_kid_today_internal(kid_id, today_date_obj):
     assigned_chores_sql = """
         SELECT ca.id as assignment_id, ca.kid_id, ca.chore_id, cm.name as chore_name, cm.icon as chore_icon, ca.frequency
         FROM chore_assignments ca JOIN chores_master cm ON ca.chore_id = cm.id
-        WHERE ca.kid_id = ? AND ca.is_active = 1 -- Only fetch active assignments
+        WHERE ca.kid_id = ? AND ca.is_active = 1 
     """
     all_kid_assignments = query_db(assigned_chores_sql, (kid_id,))
     chores_due_today = []
@@ -296,7 +328,7 @@ def get_kid_chores_today_api(kid_id):
     if not kid_info: return jsonify({"error": "Kid not found"}), 404
     return jsonify({"kid_info": dict(kid_info), "chores": chores})
 
-@app.route('/api/completions', methods=['POST']) # Mark chore complete
+@app.route('/api/completions', methods=['POST']) 
 def mark_chore_complete():
     data = request.json; kid_id = data.get('kidId'); assignment_id = data.get('assignmentId'); chore_id = data.get('choreId')
     today_date_obj = date.today(); today_date_str = today_date_obj.isoformat()
@@ -327,7 +359,7 @@ def mark_chore_complete():
     updated_kid_info = query_db("SELECT k.balloons, k.train_track_length, k.train_laps_completed, COUNT(s.id) as stars_count FROM kids k LEFT JOIN stars s ON k.id = s.kid_id WHERE k.id = ? GROUP BY k.id", (kid_id,), one=True)
     return jsonify({"message": "Chore marked complete!", "balloons_awarded": 1, "stars_from_balloons": stars_from_balloons, "daily_star_awarded": daily_star_awarded_this_action, "updated_kid_stats": dict(updated_kid_info) if updated_kid_info else {}}), 200
 
-@app.route('/api/completions/uncheck', methods=['POST']) # Uncheck chore
+@app.route('/api/completions/uncheck', methods=['POST']) 
 def uncheck_chore_complete():
     data = request.json; kid_id = data.get('kidId'); assignment_id = data.get('assignmentId')
     today_date_obj = date.today(); today_date_str = today_date_obj.isoformat()
@@ -425,9 +457,15 @@ def initdb_command():
     db_path = os.path.join(app.root_path, DATABASE)
     db_dir = os.path.dirname(db_path)
     if not os.path.exists(db_dir): os.makedirs(db_dir)
-    with sqlite3.connect(db_path) as conn: conn.executescript(SCHEMA_SQL)
+    # For CLI init, we explicitly want to drop and recreate.
+    # So, we connect and then run the schema.
+    with sqlite3.connect(db_path) as conn:
+        print(f"Initializing DB at {db_path} via flask initdb command (will drop existing tables)...")
+        init_db_schema(conn) # Use the helper
     print(f'Initialized the database at {db_path} with schema string.')
 
+# This __main__ block is for running with `python app.py` (Flask dev server)
+# Gunicorn will not execute this block.
 if __name__ == '__main__':
     with app.app_context(): 
         db_full_path = os.path.join(app.root_path, DATABASE)
@@ -435,8 +473,14 @@ if __name__ == '__main__':
         if not os.path.exists(db_directory):
             try: os.makedirs(db_directory); print(f"Created database directory for __main__: {db_directory}")
             except OSError as e: print(f"Error creating database directory {db_directory} in __main__: {e}")
+        
+        # Check if DB file needs schema initialization when running with `python app.py`
         if not os.path.exists(db_full_path):
-            print(f"Database {db_full_path} not found. Initializing...")
-            db_conn = get_db(); db_conn.cursor().executescript(SCHEMA_SQL); db_conn.commit()
-            print("Database initialized on startup.")
+            print(f"Database {db_full_path} not found. Initializing for `python app.py`...")
+            # Need a connection to initialize schema
+            temp_conn_for_init = sqlite3.connect(db_full_path)
+            init_db_schema(temp_conn_for_init)
+            temp_conn_for_init.close()
+            print("Database initialized on startup for `python app.py`.")
+    
     app.run(host='0.0.0.0', port=5000, debug=True)
