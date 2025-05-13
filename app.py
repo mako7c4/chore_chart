@@ -8,7 +8,7 @@ from datetime import date # Use date for date comparisons
 # --- App Configuration ---
 app = Flask(__name__)
 DATABASE = 'chore_chart.db'
-ADMIN_PASSWORD = os.environ.get('ADMIN_PASSWORD', 'supersecret')
+ADMIN_PASSWORD = os.environ.get('ADMIN_PASSWORD', 'supersecret') # Add -e ADMIN_PASSWORD="your_strong_password" with docker run to not use the default
 BALLOONS_PER_STAR = 10 # Make this configurable if needed later
 
 # --- Database Setup & Helpers ---
