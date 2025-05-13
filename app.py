@@ -105,7 +105,7 @@ CREATE TABLE chore_completions (
     assignment_id INTEGER,
     kid_id INTEGER NOT NULL,
     chore_id INTEGER NOT NULL,
-    date_completed TEXT NOT NULL, -- YYYY-MM-DD
+    date_completed TEXT NOT NULL, --YYYY-MM-DD
     completed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (kid_id) REFERENCES kids (id) ON DELETE CASCADE,
     FOREIGN KEY (chore_id) REFERENCES chores_master (id) ON DELETE CASCADE,
@@ -116,7 +116,7 @@ DROP TABLE IF EXISTS stars;
 CREATE TABLE stars (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     kid_id INTEGER NOT NULL,
-    date_awarded TEXT NOT NULL, -- YYYY-MM-DD
+    date_awarded TEXT NOT NULL, --YYYY-MM-DD
     type TEXT NOT NULL, -- 'daily', 'bonus', 'balloon_conversion'
     reason TEXT,
     FOREIGN KEY (kid_id) REFERENCES kids (id) ON DELETE CASCADE
@@ -343,7 +343,7 @@ def award_bonus_star():
 
 # --- Admin Reset & Decrement Endpoints (Unchanged from v3) ---
 @app.route('/api/admin/kids/<int:kid_id>/reset-daily-chores', methods=['POST'])
-def admin_reset_daily_chores():
+def admin_reset_daily_chores(kid_id): # Added kid_id parameter
     if not check_admin_auth(): return jsonify({"error": "Unauthorized"}), 401
     today_date_str = date.today().isoformat()
     execute_db("DELETE FROM chore_completions WHERE kid_id = ? AND date_completed = ?", (kid_id, today_date_str))
@@ -354,7 +354,7 @@ def admin_reset_daily_chores():
     return jsonify({"message": f"Daily chores and daily star (if any) for kid {kid_id} reset for today."}), 200
 
 @app.route('/api/admin/kids/<int:kid_id>/decrement-balloons', methods=['POST'])
-def admin_decrement_balloons():
+def admin_decrement_balloons(kid_id): # Added kid_id parameter
     if not check_admin_auth(): return jsonify({"error": "Unauthorized"}), 401
     data = request.json; count = data.get('count', 1)
     try: count = int(count)
@@ -366,7 +366,7 @@ def admin_decrement_balloons():
     return jsonify({"message": f"{count} balloon(s) decremented for kid {kid_id}. New total: {new_balloons}."}), 200
 
 @app.route('/api/admin/kids/<int:kid_id>/decrement-stars', methods=['POST'])
-def admin_decrement_stars():
+def admin_decrement_stars(kid_id): # Added kid_id parameter
     if not check_admin_auth(): return jsonify({"error": "Unauthorized"}), 401
     data = request.json; count = data.get('count', 1); star_type_filter = data.get('type', None)
     try: count = int(count)
@@ -382,7 +382,7 @@ def admin_decrement_stars():
     return jsonify({"message": f"{len(stars_to_delete)} star(s) decremented for kid {kid_id}."}), 200
 
 @app.route('/api/admin/kids/<int:kid_id>/train-config', methods=['PUT'])
-def admin_configure_train_track():
+def admin_configure_train_track(kid_id): # Added kid_id parameter HERE
     if not check_admin_auth(): return jsonify({"error": "Unauthorized"}), 401
     data = request.json; track_length = data.get('train_track_length')
     try: track_length = int(track_length)
