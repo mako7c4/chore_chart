@@ -1,3 +1,5 @@
+# chore_chart_project/Dockerfile
+
 # Use an official Python runtime as a parent image
 # Using python:3.9-slim as a base for a smaller image size.
 FROM python:3.9-slim
@@ -25,11 +27,13 @@ EXPOSE 5000
 # Define environment variables.
 # ADMIN_PASSWORD can be overridden at runtime using `docker run -e`.
 ENV ADMIN_PASSWORD="supersecret"
-# FLASK_APP tells Flask which file to run.
+# FLASK_APP tells Flask which file to run (primarily for 'flask run' command).
 ENV FLASK_APP=app.py
-# FLASK_RUN_HOST=0.0.0.0 makes the Flask dev server (if used) accessible externally.
-# Gunicorn uses its own binding options.
+# FLASK_RUN_HOST makes the Flask dev server (if used) accessible externally.
 ENV FLASK_RUN_HOST=0.0.0.0
+# Explicitly add the working directory to PYTHONPATH.
+# This helps Gunicorn and Python's import system locate the 'app' module.
+ENV PYTHONPATH /app
 
 # Command to run the application.
 # Uses Gunicorn for a more production-ready WSGI server.
