@@ -5,7 +5,7 @@ Simple chore charts for kids
 docker build -t chore-chart-app .
 
 ## docker run:
-docker run -p 5000:5000 -e ADMIN_PASSWORD="your_strong_password" -v "$(pwd)/db_data:/app" chore-chart-app
+docker run -p 5000:5000 -e ADMIN_PASSWORD="your_strong_password" -v "$(pwd)/db_data:/app/data" chore-chart-app
 
 ## Default page 
 ![image](https://github.com/user-attachments/assets/9f0b6567-d8ee-4f25-a70d-a98f4e1ff2cf)
