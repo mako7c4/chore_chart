@@ -1,7 +1,9 @@
+# chore_chart_project/app.py
+
 from flask import Flask, request, jsonify, render_template, g
 import sqlite3
 import os
-from datetime import date # Use date for date comparisons
+from datetime import date, datetime # Import datetime to check current time
 
 # --- App Configuration ---
 app = Flask(__name__)
@@ -105,6 +107,7 @@ CREATE TABLE chore_assignments (
     chore_id INTEGER,
     frequency TEXT NOT NULL,
     is_active BOOLEAN DEFAULT 1, 
+    timeframe TEXT DEFAULT 'any', -- NEW: 'any', 'morning', 'night'
     FOREIGN KEY (kid_id) REFERENCES kids (id) ON DELETE CASCADE,
     FOREIGN KEY (chore_id) REFERENCES chores_master (id) ON DELETE CASCADE
 );
@@ -152,7 +155,7 @@ def update_train_laps(kid_id):
 def index():
     return render_template('index.html')
 
-# --- NEW: Admin Login Endpoint ---
+# --- Admin Login Endpoint ---
 @app.route('/api/admin/login', methods=['POST'])
 def admin_login():
     data = request.json
@@ -236,7 +239,7 @@ def update_master_chore(chore_id):
 def get_assignments():
     sql = """
         SELECT ca.id, ca.kid_id, k.name as kid_name, ca.chore_id, 
-               cm.name as chore_name, cm.icon as chore_icon, ca.frequency, ca.is_active
+               cm.name as chore_name, cm.icon as chore_icon, ca.frequency, ca.is_active, ca.timeframe
         FROM chore_assignments ca 
         JOIN kids k ON ca.kid_id = k.id 
         JOIN chores_master cm ON ca.chore_id = cm.id
@@ -248,7 +251,11 @@ def get_assignments():
 @app.route('/api/assignments', methods=['POST'])
 def add_assignment():
     if not check_admin_auth(): return jsonify({"error": "Unauthorized"}), 401
-    data = request.json; kid_id_input = data.get('kidId'); chore_id = data.get('choreId'); frequency = data.get('frequency')
+    data = request.json
+    kid_id_input = data.get('kidId')
+    chore_id = data.get('choreId')
+    frequency = data.get('frequency')
+    timeframe = data.get('timeframe', 'any') # Get timeframe, default to 'any'
     if not chore_id or not frequency: return jsonify({"error": "Chore ID and frequency are required"}), 400
     assigned_ids = []; kids_to_assign = []
     if kid_id_input == 'all':
@@ -259,9 +266,9 @@ def add_assignment():
     else: return jsonify({"error": "Kid ID ('all' or specific) is required"}), 400
     if not kids_to_assign: return jsonify({"error": "No kids found to assign chores to."}), 400
     for k_id in kids_to_assign:
-        existing = query_db("SELECT id FROM chore_assignments WHERE kid_id = ? AND chore_id = ? AND frequency = ?", (k_id, chore_id, frequency), one=True)
+        existing = query_db("SELECT id FROM chore_assignments WHERE kid_id = ? AND chore_id = ? AND frequency = ? AND timeframe = ?", (k_id, chore_id, frequency, timeframe), one=True)
         if not existing: 
-            assignment_id = execute_db("INSERT INTO chore_assignments (kid_id, chore_id, frequency, is_active) VALUES (?, ?, ?, 1)", (k_id, chore_id, frequency))
+            assignment_id = execute_db("INSERT INTO chore_assignments (kid_id, chore_id, frequency, is_active, timeframe) VALUES (?, ?, ?, 1, ?)", (k_id, chore_id, frequency, timeframe))
             assigned_ids.append(assignment_id)
     if not assigned_ids: return jsonify({"message": "Chores already assigned or no new assignments made."}), 200
     return jsonify({"message": "Chore(s) assigned successfully", "assignment_ids": assigned_ids}), 201
@@ -277,10 +284,11 @@ def edit_assignment(assignment_id):
     if not check_admin_auth(): return jsonify({"error": "Unauthorized"}), 401
     data = request.json
     new_frequency = data.get('frequency')
-    if not new_frequency: 
-        return jsonify({"error": "Frequency is required"}), 400
-    execute_db("UPDATE chore_assignments SET frequency = ? WHERE id = ?", (new_frequency, assignment_id))
-    return jsonify({"message": "Assignment frequency updated."}), 200
+    new_timeframe = data.get('timeframe')
+    if not new_frequency or not new_timeframe: 
+        return jsonify({"error": "Frequency and timeframe are required"}), 400
+    execute_db("UPDATE chore_assignments SET frequency = ?, timeframe = ? WHERE id = ?", (new_frequency, new_timeframe, assignment_id))
+    return jsonify({"message": "Assignment updated."}), 200
 
 @app.route('/api/assignments/<int:assignment_id>/toggle-active', methods=['POST'])
 def toggle_assignment_active(assignment_id):
@@ -300,12 +308,16 @@ def get_chores_for_kid_today_internal(kid_id, today_date_obj):
     day_names = ["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"]
     current_day_name = day_names[day_of_week_idx]
     assigned_chores_sql = """
-        SELECT ca.id as assignment_id, ca.kid_id, ca.chore_id, cm.name as chore_name, cm.icon as chore_icon, ca.frequency
+        SELECT ca.id as assignment_id, ca.kid_id, ca.chore_id, cm.name as chore_name, 
+               cm.icon as chore_icon, ca.frequency, ca.timeframe
         FROM chore_assignments ca JOIN chores_master cm ON ca.chore_id = cm.id
         WHERE ca.kid_id = ? AND ca.is_active = 1 
     """
     all_kid_assignments = query_db(assigned_chores_sql, (kid_id,))
-    chores_due_today = []
+    
+    # Initialize lists for each timeframe
+    chores_due_today = {'morning': [], 'night': [], 'any': []}
+
     for assignment in all_kid_assignments:
         assignment_dict = dict(assignment); is_due = False
         if assignment_dict['frequency'] == 'daily': is_due = True
@@ -316,15 +328,36 @@ def get_chores_for_kid_today_internal(kid_id, today_date_obj):
             completion = query_db("SELECT id FROM chore_completions WHERE assignment_id = ? AND kid_id = ? AND date_completed = ?",
                                   (assignment_dict['assignment_id'], kid_id, today_date_str), one=True)
             assignment_dict['completed_today'] = True if completion else False
-            chores_due_today.append(assignment_dict)
+            
+            # Add to the correct timeframe list
+            timeframe = assignment_dict.get('timeframe', 'any')
+            if timeframe in chores_due_today:
+                chores_due_today[timeframe].append(assignment_dict)
+            else: # Fallback for any other value
+                chores_due_today['any'].append(assignment_dict)
+
     return chores_due_today
 
 @app.route('/api/kids/<int:kid_id>/chores-today', methods=['GET'])
 def get_kid_chores_today_api(kid_id):
-    chores = get_chores_for_kid_today_internal(kid_id, date.today())
+    chores_by_timeframe = get_chores_for_kid_today_internal(kid_id, date.today())
+    
+    # Determine current timeframe
+    current_hour = datetime.now().hour
+    if current_hour < 12: # Before noon is morning
+        current_timeframe = 'morning'
+    elif current_hour >= 17: # 5 PM or later is night
+        current_timeframe = 'night'
+    else: # Afternoon, no specific routine
+        current_timeframe = 'any'
+
     kid_info = query_db("SELECT k.id, k.name, k.avatar_color, k.balloons, k.train_track_length, k.train_laps_completed, COUNT(s.id) as stars_count FROM kids k LEFT JOIN stars s ON k.id = s.kid_id WHERE k.id = ? GROUP BY k.id", (kid_id,), one=True)
     if not kid_info: return jsonify({"error": "Kid not found"}), 404
-    return jsonify({"kid_info": dict(kid_info), "chores": chores})
+    return jsonify({
+        "kid_info": dict(kid_info), 
+        "chores": chores_by_timeframe,
+        "current_timeframe": current_timeframe
+    })
 
 @app.route('/api/completions', methods=['POST']) 
 def mark_chore_complete():
@@ -346,8 +379,10 @@ def mark_chore_complete():
             update_train_laps(kid_id) 
     daily_star_awarded_this_action = False
     chores_due_today = get_chores_for_kid_today_internal(kid_id, today_date_obj)
-    if chores_due_today:
-        all_done = all(c['completed_today'] for c in chores_due_today)
+    # Check if all chores (across all timeframes) are done
+    all_chores_for_day = chores_due_today['morning'] + chores_due_today['night'] + chores_due_today['any']
+    if all_chores_for_day:
+        all_done = all(c['completed_today'] for c in all_chores_for_day)
         if all_done:
             daily_star_exists = query_db("SELECT id FROM stars WHERE kid_id = ? AND date_awarded = ? AND type = 'daily'", (kid_id, today_date_str), one=True)
             if not daily_star_exists:
@@ -378,7 +413,8 @@ def uncheck_chore_complete():
             update_train_laps(kid_id) 
     daily_star_revoked = False
     chores_due_today_after_uncheck = get_chores_for_kid_today_internal(kid_id, today_date_obj)
-    all_done_after_uncheck = all(c['completed_today'] for c in chores_due_today_after_uncheck) if chores_due_today_after_uncheck else False
+    all_chores_for_day = chores_due_today_after_uncheck['morning'] + chores_due_today_after_uncheck['night'] + chores_due_today_after_uncheck['any']
+    all_done_after_uncheck = all(c['completed_today'] for c in all_chores_for_day) if all_chores_for_day else False
     daily_star_record = query_db("SELECT id FROM stars WHERE kid_id = ? AND date_awarded = ? AND type = 'daily'", (kid_id, today_date_str), one=True)
     if daily_star_record and not all_done_after_uncheck:
         execute_db("DELETE FROM stars WHERE id = ?", (daily_star_record['id'],))
