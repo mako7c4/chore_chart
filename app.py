@@ -1,5 +1,3 @@
-# chore_chart_project/app.py
-
 from flask import Flask, request, jsonify, render_template, g
 import sqlite3
 import os
@@ -75,11 +73,6 @@ def query_db(query, args=(), one=False):
 def execute_db(query, args=()):
     db = get_db()
     cur = db.cursor()
-    # For DELETE operations, ensure foreign key constraints are enabled for this connection
-    # if they are not enabled by default by the SQLite version/build.
-    # However, `ON DELETE CASCADE` in schema should handle it if DB supports it.
-    # For safety, one might execute `PRAGMA foreign_keys = ON;` once per connection.
-    # But usually, it's enabled by default or handled by the schema correctly.
     cur.execute(query, args)
     db.commit()
     last_row_id = cur.lastrowid
@@ -159,6 +152,16 @@ def update_train_laps(kid_id):
 def index():
     return render_template('index.html')
 
+# --- NEW: Admin Login Endpoint ---
+@app.route('/api/admin/login', methods=['POST'])
+def admin_login():
+    data = request.json
+    password_attempt = data.get('password')
+    if password_attempt == ADMIN_PASSWORD:
+        return jsonify({"success": True}), 200
+    else:
+        return jsonify({"error": "Incorrect password"}), 401
+
 # --- Kids API ---
 @app.route('/api/kids', methods=['GET'])
 def get_kids():
@@ -183,12 +186,10 @@ def update_kid(kid_id):
     data = request.json
     name = data.get('name')
     track_length = data.get('train_track_length')
-
     if not name or not isinstance(name, str) or not name.strip():
         return jsonify({"error": "Valid kid name is required"}), 400
     if track_length is None or not isinstance(track_length, int) or track_length <= 0:
         return jsonify({"error": "Valid positive train track length is required"}), 400
-
     execute_db("UPDATE kids SET name = ?, train_track_length = ? WHERE id = ?", (name.strip(), track_length, kid_id))
     update_train_laps(kid_id) 
     updated_kid = query_db("SELECT k.id, k.name, k.avatar_color, k.balloons, k.train_track_length, k.train_laps_completed, COUNT(s.id) as stars_count FROM kids k LEFT JOIN stars s ON k.id = s.kid_id WHERE k.id = ? GROUP BY k.id", (kid_id,), one=True)
@@ -197,13 +198,9 @@ def update_kid(kid_id):
 @app.route('/api/kids/<int:kid_id>', methods=['DELETE'])
 def delete_kid(kid_id):
     if not check_admin_auth(): return jsonify({"error": "Unauthorized"}), 401
-    
     kid_exists = query_db("SELECT id FROM kids WHERE id = ?", (kid_id,), one=True)
     if not kid_exists:
         return jsonify({"error": "Kid not found"}), 404
-
-    # ON DELETE CASCADE in schema should handle related deletions in:
-    # chore_assignments, chore_completions, stars
     execute_db("DELETE FROM kids WHERE id = ?", (kid_id,))
     return jsonify({"message": f"Kid {kid_id} and all associated data deleted successfully."}), 200
 
@@ -228,10 +225,8 @@ def update_master_chore(chore_id):
     data = request.json
     name = data.get('name')
     icon = data.get('icon', '') 
-
     if not name or not isinstance(name, str) or not name.strip():
         return jsonify({"error": "Valid chore name is required"}), 400
-    
     execute_db("UPDATE chores_master SET name = ?, icon = ? WHERE id = ?", (name.strip(), icon, chore_id))
     updated_chore = query_db("SELECT * FROM chores_master WHERE id = ?", (chore_id,), one=True)
     return jsonify(dict(updated_chore)), 200
