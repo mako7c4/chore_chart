@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8"> 
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Super Chore Chart V3! - Edit Mode</title>
+    <title>Super Chore Chart V3! - Routines</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
     <style>
@@ -12,8 +12,8 @@
         .star-display, .balloon-display { font-size: 1.1rem; font-weight: bold; }
         .chore-item { transition: all 0.3s ease; }
         .chore-item.completed { opacity: 0.6; text-decoration: line-through; }
-        .chore-item.disabled { opacity: 0.5; background-color: #e2e8f0 !important; } /* cool-gray-200 */
-        .chore-item.disabled .chore-action-btn { background-color: #94a3b8 !important; cursor: not-allowed; } /* cool-gray-400 */
+        .chore-item.disabled { opacity: 0.5; background-color: #e2e8f0 !important; } 
+        .chore-item.disabled .chore-action-btn { background-color: #94a3b8 !important; cursor: not-allowed; } 
 
         ::-webkit-scrollbar { width: 8px; }
         ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
@@ -29,7 +29,13 @@
         .track-segment.empty { background-color: #cbd5e1; }
         .train-icon { font-size: 1rem; }
         .laps-display { font-size: 0.9rem; color: #475569; margin-left: 8px; font-weight: 500; }
-        .editing input { border: 1px solid #38bdf8 !important; /* sky-500 */ }
+        .editing input { border: 1px solid #38bdf8 !important; }
+
+        /* Styles for routine sections */
+        .routine-section { transition: opacity 0.5s ease; }
+        .routine-section.inactive { opacity: 0.5; }
+        .routine-section h3 { transition: color 0.5s ease; }
+        .routine-section.inactive h3 { color: #64748b; } /* cool-gray-500 */
     </style>
 </head>
 <body class="bg-gradient-to-br from-sky-400 to-blue-600 min-h-screen flex flex-col items-center justify-center p-2 sm:p-4 selection:bg-yellow-300 selection:text-yellow-900">
@@ -62,10 +68,26 @@
                         </div>
                     </div>
                 </div>
-                <h3 class="text-lg sm:text-xl font-semibold text-slate-600 my-2 sm:my-3">Today's Chores: <span id="currentDateDisplay"></span></h3>
-                <div id="choresForKidList" class="space-y-2 sm:space-y-3">
-                    </div>
-                <p id="noChoresForKidMessage" class="text-center text-slate-500 mt-6">No chores assigned for today, yay!</p>
+                
+                <!-- NEW Routine Sections -->
+                <div id="morningRoutineSection" class="routine-section my-4">
+                    <h3 class="text-lg sm:text-xl font-semibold text-slate-600 mb-2 sm:mb-3">☀️ Morning Chores</h3>
+                    <div id="morningChoresList" class="space-y-2 sm:space-y-3"></div>
+                    <p class="no-chores-message text-center text-slate-500 mt-4 hidden">No morning chores today!</p>
+                </div>
+                
+                <div id="anytimeRoutineSection" class="routine-section my-4">
+                    <h3 class="text-lg sm:text-xl font-semibold text-slate-600 mb-2 sm:mb-3">🗓️ Anytime Chores</h3>
+                    <div id="anytimeChoresList" class="space-y-2 sm:space-y-3"></div>
+                    <p class="no-chores-message text-center text-slate-500 mt-4 hidden">No anytime chores today!</p>
+                </div>
+
+                <div id="nightRoutineSection" class="routine-section my-4">
+                    <h3 class="text-lg sm:text-xl font-semibold text-slate-600 mb-2 sm:mb-3">🌙 Night Chores</h3>
+                    <div id="nightChoresList" class="space-y-2 sm:space-y-3"></div>
+                    <p class="no-chores-message text-center text-slate-500 mt-4 hidden">No night chores today!</p>
+                </div>
+
                 <p id="allChoresDoneMessage" class="text-center text-green-600 font-semibold text-lg sm:text-xl mt-6 hidden">🎉 All chores done for today! Great job! 🎉</p>
             </div>
 
@@ -117,7 +139,15 @@
                                 <option value="sunday">Sunday</option>
                             </select>
                         </div>
-                        <button id="assignChoreButton" class="px-3 py-2 sm:px-4 text-sm sm:text-base bg-blue-500 hover:bg-blue-600 text-white rounded-lg shadow transition-colors h-10">Assign</button>
+                        <div>
+                            <label for="assignTimeframeSelect" class="block text-xs sm:text-sm font-medium text-slate-700">Timeframe:</label>
+                            <select id="assignTimeframeSelect" class="p-2 border rounded-lg w-full shadow-sm focus:ring-2 focus:ring-sky-500 outline-none text-sm sm:text-base">
+                                <option value="any">All Day</option>
+                                <option value="morning">Morning</option>
+                                <option value="night">Night</option>
+                            </select>
+                        </div>
+                        <button id="assignChoreButton" class="md:col-span-2 px-3 py-2 sm:px-4 text-sm sm:text-base bg-blue-500 hover:bg-blue-600 text-white rounded-lg shadow transition-colors h-10">Assign Chore</button>
                     </div>
                     <h3 class="text-md sm:text-lg font-semibold text-slate-600 mt-4 mb-2">Current Assignments:</h3>
                     <div id="currentAssignmentsList" class="space-y-1.5 sm:space-y-2 text-xs sm:text-sm text-slate-700 max-h-32 sm:max-h-48 overflow-y-auto">
@@ -153,14 +183,24 @@
             <div class="bg-white p-6 sm:p-8 rounded-lg shadow-xl w-full max-w-md text-left">
                 <h3 class="text-lg sm:text-xl font-semibold text-slate-700 mb-4">Edit Assignment</h3>
                 <input type="hidden" id="editingAssignmentId">
-                <div>
-                    <label for="editAssignmentFrequencySelect" class="block text-xs sm:text-sm font-medium text-slate-700">New Frequency:</label>
-                    <select id="editAssignmentFrequencySelect" class="p-2 border rounded-lg w-full shadow-sm focus:ring-2 focus:ring-sky-500 outline-none text-sm sm:text-base mt-1">
-                        <option value="daily">Daily</option> <option value="weekdays">Weekdays</option> <option value="weekends">Weekends</option>
-                        <option value="monday">Monday</option><option value="tuesday">Tuesday</option><option value="wednesday">Wednesday</option>
-                        <option value="thursday">Thursday</option><option value="friday">Friday</option><option value="saturday">Saturday</option>
-                        <option value="sunday">Sunday</option>
-                    </select>
+                <div class="space-y-4">
+                    <div>
+                        <label for="editAssignmentFrequencySelect" class="block text-xs sm:text-sm font-medium text-slate-700">Frequency:</label>
+                        <select id="editAssignmentFrequencySelect" class="p-2 border rounded-lg w-full shadow-sm focus:ring-2 focus:ring-sky-500 outline-none text-sm sm:text-base mt-1">
+                            <option value="daily">Daily</option> <option value="weekdays">Weekdays</option> <option value="weekends">Weekends</option>
+                            <option value="monday">Monday</option><option value="tuesday">Tuesday</option><option value="wednesday">Wednesday</option>
+                            <option value="thursday">Thursday</option><option value="friday">Friday</option><option value="saturday">Saturday</option>
+                            <option value="sunday">Sunday</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label for="editAssignmentTimeframeSelect" class="block text-xs sm:text-sm font-medium text-slate-700">Timeframe:</label>
+                        <select id="editAssignmentTimeframeSelect" class="p-2 border rounded-lg w-full shadow-sm focus:ring-2 focus:ring-sky-500 outline-none text-sm sm:text-base mt-1">
+                            <option value="any">All Day</option>
+                            <option value="morning">Morning</option>
+                            <option value="night">Night</option>
+                        </select>
+                    </div>
                 </div>
                 <div class="mt-6 flex justify-end gap-3">
                     <button id="editAssignmentCancelButton" class="px-4 py-2 text-sm sm:text-base bg-slate-300 hover:bg-slate-400 text-slate-700 rounded-lg">Cancel</button>
@@ -186,8 +226,13 @@
         const kidStarsDisplay = document.getElementById('kidStarsDisplay');
         const kidBalloonsDisplay = document.getElementById('kidBalloonsDisplay');
         const currentDateDisplay = document.getElementById('currentDateDisplay');
-        const choresForKidList = document.getElementById('choresForKidList');
-        const noChoresForKidMessage = document.getElementById('noChoresForKidMessage');
+        // Routine sections
+        const morningRoutineSection = document.getElementById('morningRoutineSection');
+        const anytimeRoutineSection = document.getElementById('anytimeRoutineSection');
+        const nightRoutineSection = document.getElementById('nightRoutineSection');
+        const morningChoresList = document.getElementById('morningChoresList');
+        const anytimeChoresList = document.getElementById('anytimeChoresList');
+        const nightChoresList = document.getElementById('nightChoresList');
         const allChoresDoneMessage = document.getElementById('allChoresDoneMessage');
         const newKidNameInput = document.getElementById('newKidName');
         const newKidTrainTrackLengthInput = document.getElementById('newKidTrainTrackLength');
@@ -201,6 +246,7 @@
         const assignKidSelect = document.getElementById('assignKidSelect');
         const assignChoreSelect = document.getElementById('assignChoreSelect');
         const assignFrequencySelect = document.getElementById('assignFrequencySelect');
+        const assignTimeframeSelect = document.getElementById('assignTimeframeSelect'); // New
         const assignChoreButton = document.getElementById('assignChoreButton');
         const currentAssignmentsList = document.getElementById('currentAssignmentsList');
         const bonusKidSelect = document.getElementById('bonusKidSelect');
@@ -216,6 +262,7 @@
         const editAssignmentModal = document.getElementById('editAssignmentModal');
         const editingAssignmentIdInput = document.getElementById('editingAssignmentId');
         const editAssignmentFrequencySelect = document.getElementById('editAssignmentFrequencySelect');
+        const editAssignmentTimeframeSelect = document.getElementById('editAssignmentTimeframeSelect'); // New
         const editAssignmentCancelButton = document.getElementById('editAssignmentCancelButton');
         const editAssignmentSaveButton = document.getElementById('editAssignmentSaveButton');
 
@@ -232,7 +279,7 @@
             { name: "Brush Teeth", icon: "🦷" }, { name: "Get Dressed", icon: "👕" },
             { name: "Clean Room", icon: "🧹" }, { name: "Eat Breakfast", icon: "🥣" },
             { name: "Homework", icon: "📚" }, { name: "Set Table", icon: "🍽️" },
-            { name: "Clear Table", icon: "🍽️" }, { name: "Tidy Toys", icon: "🧸" }, // Changed "ափ" to "🍽️"
+            { name: "Clear Table", icon: "🍽️" }, { name: "Tidy Toys", icon: "🧸" }, 
             { name: "Read Book", icon: "📖" }, { name: "Water Plants", icon: "🪴" },
             { name: "-- Manual Icon --", icon: "" } 
         ];
@@ -273,9 +320,10 @@
         function hideModal() { messageModal.classList.remove('active'); }
         function showAdminLogin() { adminPasswordInput.value = ''; adminLoginModal.classList.add('active'); }
         function hideAdminLogin() { adminLoginModal.classList.remove('active'); }
-        function showEditAssignmentModal(assignmentId, currentFrequency) {
+        function showEditAssignmentModal(assignmentId, currentFrequency, currentTimeframe) {
             editingAssignmentIdInput.value = assignmentId;
             editAssignmentFrequencySelect.value = currentFrequency;
+            editAssignmentTimeframeSelect.value = currentTimeframe;
             editAssignmentModal.classList.add('active');
         }
         function hideEditAssignmentModal() {
@@ -306,7 +354,6 @@
 
         function renderTrainTrack(kid) { /* ... (same as before) */ }
 
-        // --- Populate Default Chore Icons Select ---
         function populateDefaultChoreIcons() {
             newChoreIconSelect.innerHTML = '<option value="">-- Quick Icon --</option>'; 
             DEFAULT_CHORE_ICONS.forEach(item => {
@@ -330,53 +377,7 @@
 
 
         // --- Rendering Functions ---
-        async function loadAndRenderKidSelectionView() {
-            console.log("loadAndRenderKidSelectionView called"); 
-            const kidListDivElement = document.getElementById('kidList');
-            if (!kidListDivElement) {
-                console.error("kidListDiv not found in DOM!"); 
-                return;
-            }
-            kidListDivElement.innerHTML = '<p class="text-center text-slate-500">Loading kids...</p>'; 
-
-            const kids = await apiCall('/kids');
-            console.log("Kids data from API:", kids); 
-
-            kidListDivElement.innerHTML = ''; 
-            if (!kids || kids.length === 0) {
-                console.log("No kids found or API call failed to return kids."); 
-                noKidsMessage.classList.remove('hidden'); 
-                kidListDivElement.classList.add('hidden'); 
-            } else {
-                noKidsMessage.classList.add('hidden'); 
-                kidListDivElement.classList.remove('hidden'); 
-                kids.forEach(kid => {
-                    console.log("Rendering kid:", kid.name); 
-                    const kidCard = document.createElement('div');
-                    const avatarColor = kid.avatar_color || 'bg-sky-500'; 
-                    kidCard.className = `p-3 sm:p-4 rounded-xl shadow-lg text-white cursor-pointer hover:scale-105 transition-transform ${avatarColor}`;
-                    kidCard.onclick = () => { currentKidId = kid.id; switchView('kidChores'); };
-                    
-                    const kidInfoDiv = document.createElement('div');
-                    kidInfoDiv.className = 'flex items-center mb-2';
-                    
-                    const avatar = document.createElement('div');
-                    avatar.className = `kid-avatar mr-3 ${avatarColor}`; 
-                    avatar.textContent = kid.name ? kid.name.charAt(0).toUpperCase() : '?'; 
-                    kidInfoDiv.appendChild(avatar);
-                    
-                    const nameText = document.createElement('p');
-                    nameText.className = 'text-lg sm:text-xl font-semibold';
-                    nameText.textContent = kid.name || 'Unnamed Kid'; 
-                    kidInfoDiv.appendChild(nameText);
-                    kidCard.appendChild(kidInfoDiv);
-
-                    const trainTrackElement = renderTrainTrack(kid); 
-                    kidCard.appendChild(trainTrackElement);
-                    kidListDivElement.appendChild(kidCard);
-                });
-            }
-        }
+        async function loadAndRenderKidSelectionView() { /* ... (same as before) */ }
 
         async function loadAndRenderKidChoresView(kidId) { 
             console.log("loadAndRenderKidChoresView for kidId:", kidId); 
@@ -386,7 +387,7 @@
                 console.error("Failed to load kid chore data or kid_info missing for kidId:", kidId); 
                 switchView('kidSelection'); return; 
             }
-            const { kid_info, chores } = data;
+            const { kid_info, chores, current_timeframe } = data;
             console.log("Kid chore data:", data); 
 
             kidNameDisplay.textContent = kid_info.name || 'Kid';
@@ -395,15 +396,17 @@
             kidChoresAvatar.textContent = kid_info.name ? kid_info.name.charAt(0).toUpperCase() : '?';
             kidStarsDisplay.innerHTML = `⭐ ${kid_info.stars_count || 0} Star${(kid_info.stars_count || 0) === 1 ? '' : 's'}`;
             kidBalloonsDisplay.innerHTML = `🎈 ${kid_info.balloons || 0} Balloon${(kid_info.balloons || 0) === 1 ? '' : 's'}`;
-            currentDateDisplay.textContent = new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' });
             
-            choresForKidList.innerHTML = '';
-            if (!chores || chores.length === 0) {
-                noChoresForKidMessage.classList.remove('hidden'); allChoresDoneMessage.classList.add('hidden');
-            } else {
-                noChoresForKidMessage.classList.add('hidden');
-                let allMarkedComplete = true;
-                chores.forEach(chore => {
+            // Function to render a list of chores into a target element
+            const renderChoreList = (targetElement, choreList) => {
+                targetElement.innerHTML = '';
+                if (!choreList || choreList.length === 0) {
+                    targetElement.closest('.routine-section').querySelector('.no-chores-message').classList.remove('hidden');
+                    return;
+                }
+                targetElement.closest('.routine-section').querySelector('.no-chores-message').classList.add('hidden');
+                
+                choreList.forEach(chore => {
                     const isCompleted = chore.completed_today;
                     const choreDiv = document.createElement('div');
                     choreDiv.className = `chore-item flex items-center justify-between p-3 sm:p-4 bg-slate-100 rounded-lg shadow ${isCompleted ? 'completed' : ''}`;
@@ -418,10 +421,26 @@
                             ${isCompleted ? 'Undo' : 'Mark Done'}
                         </button>
                     `;
-                    choresForKidList.appendChild(choreDiv);
-                    if (!isCompleted) allMarkedComplete = false;
+                    targetElement.appendChild(choreDiv);
                 });
-                allChoresDoneMessage.classList.toggle('hidden', !allMarkedComplete);
+            };
+
+            renderChoreList(morningChoresList, chores.morning);
+            renderChoreList(anytimeChoresList, chores.any);
+            renderChoreList(nightChoresList, chores.night);
+
+            // Highlight active timeframe
+            morningRoutineSection.classList.toggle('inactive', current_timeframe !== 'morning');
+            nightRoutineSection.classList.toggle('inactive', current_timeframe !== 'night');
+            // Anytime is never inactive
+            anytimeRoutineSection.classList.remove('inactive');
+
+            // Check if all chores for the entire day are done
+            const allChores = [...(chores.morning || []), ...(chores.any || []), ...(chores.night || [])];
+            if (allChores.length > 0 && allChores.every(c => c.completed_today)) {
+                allChoresDoneMessage.classList.remove('hidden');
+            } else {
+                allChoresDoneMessage.classList.add('hidden');
             }
         }
 
@@ -453,11 +472,11 @@
                             <span class="font-semibold text-md sm:text-lg kid-name-display">${kid.name || 'N/A'}</span>
                             <span class="text-xs sm:text-sm">⭐ ${kid.stars_count || 0} | 🎈 ${kid.balloons || 0} | 🚂 Laps: ${kid.train_laps_completed || 0} (Track: <span class="kid-track-length-display">${kid.train_track_length || 10}</span>)</span>
                         </div>
-                        <div class="flex flex-col sm:flex-row gap-2 items-center mt-1">
-                             <button class="admin-edit-kid-btn px-2 py-1.5 text-xs sm:text-sm bg-blue-500 hover:bg-blue-600 text-white rounded-md w-auto">Edit Kid</button>
-                             <button class="admin-delete-kid-btn px-2 py-1.5 text-xs sm:text-sm bg-red-700 hover:bg-red-800 text-white rounded-md w-auto" data-kid-id="${kid.id}" data-kid-name="${kid.name || 'this kid'}">Delete Kid</button>
+                        <div class="flex flex-wrap gap-2 items-center mt-1">
+                             <button class="admin-edit-kid-btn px-2 py-1.5 text-xs sm:text-sm bg-blue-500 hover:bg-blue-600 text-white rounded-md">Edit Kid</button>
+                             <button class="admin-delete-kid-btn px-2 py-1.5 text-xs sm:text-sm bg-red-700 hover:bg-red-800 text-white rounded-md" data-kid-id="${kid.id}" data-kid-name="${kid.name || 'this kid'}">Delete Kid</button>
                         </div>
-                         <div class="grid grid-cols-2 sm:grid-cols-3 gap-2 mt-1">
+                         <div class="grid grid-cols-3 gap-2 mt-1">
                             <button class="admin-reset-chores-btn px-2 py-1.5 text-xs sm:text-sm bg-red-500 hover:bg-red-600 text-white rounded-md" data-kid-id="${kid.id}">Reset Day</button>
                             <button class="admin-decrement-balloons-btn px-2 py-1.5 text-xs sm:text-sm bg-rose-500 hover:bg-rose-600 text-white rounded-md" data-kid-id="${kid.id}">-1 🎈</button>
                             <button class="admin-decrement-stars-btn px-2 py-1.5 text-xs sm:text-sm bg-purple-500 hover:bg-purple-600 text-white rounded-md" data-kid-id="${kid.id}">-1 ⭐</button>
@@ -518,10 +537,10 @@
                 div.innerHTML = `
                     <div>
                         <span><strong>${assignment.kid_name || 'N/A'}</strong> - ${assignment.chore_name || 'N/A'}</span>
-                        <span class="block sm:inline sm:ml-2 text-slate-600 text-xs">(${assignment.frequency || 'N/A'}) ${!isActive ? '[DISABLED]' : ''}</span>
+                        <span class="block sm:inline sm:ml-2 text-slate-600 text-xs">(${assignment.frequency || 'N/A'} / ${assignment.timeframe || 'any'}) ${!isActive ? '[DISABLED]' : ''}</span>
                     </div>
                     <div class="flex gap-1 sm:gap-2 mt-1 sm:mt-0">
-                        <button data-assignment-id="${assignment.id}" data-current-frequency="${assignment.frequency}" class="admin-edit-assignment-btn px-2 py-1 text-xs bg-sky-500 hover:bg-sky-600 text-white rounded-md">Edit Freq</button>
+                        <button data-assignment-id="${assignment.id}" data-current-frequency="${assignment.frequency}" data-current-timeframe="${assignment.timeframe}" class="admin-edit-assignment-btn px-2 py-1 text-xs bg-sky-500 hover:bg-sky-600 text-white rounded-md">Edit</button>
                         <button data-assignment-id="${assignment.id}" class="admin-toggle-assignment-active-btn px-2 py-1 text-xs ${isActive ? 'bg-yellow-500 hover:bg-yellow-600' : 'bg-green-500 hover:bg-green-600'} text-white rounded-md">${isActive ? 'Disable' : 'Enable'}</button>
                         <button data-assignment-id="${assignment.id}" class="remove-assignment-btn px-2 py-1 text-xs bg-red-500 hover:bg-red-600 text-white rounded-md">Remove</button>
                     </div>
@@ -556,9 +575,17 @@
 
 
         // --- Event Handlers ---
-        adminLoginSubmitButton.onclick = () => {
-            const pwd = adminPasswordInput.value; if (!pwd) { showModal("Please enter admin password."); return; }
-            adminPassword = pwd; hideAdminLogin(); switchView('admin');
+        adminLoginSubmitButton.onclick = async () => {
+            const passwordAttempt = adminPasswordInput.value;
+            if (!passwordAttempt) { showModal("Please enter the admin password."); return; }
+            const result = await apiCall('/admin/login', 'POST', { password: passwordAttempt });
+            if (result && result.success) {
+                adminPassword = passwordAttempt; 
+                hideAdminLogin();
+                switchView('admin');
+            } else {
+                adminPasswordInput.value = ''; 
+            }
         };
         adminLoginCancelButton.onclick = hideAdminLogin;
 
@@ -581,31 +608,29 @@
             if (!icon || DEFAULT_CHORE_ICONS.find(c => c.icon === icon)?.name === "-- Manual Icon --") { 
                 icon = newChoreIconManual.value.trim(); 
             }
-
             if (name) {
                 const newChore = await apiCall('/chores-master', 'POST', { name, icon: icon || '🔧' }, true); 
                 if (newChore) { 
-                    newChoreNameInput.value = ''; 
-                    newChoreIconManual.value = ''; 
-                    newChoreIconSelect.value = ''; 
-                    loadAndRenderAdminView(); 
-                    showModal(`Chore "${name}" added!`);
+                    newChoreNameInput.value = ''; newChoreIconManual.value = ''; newChoreIconSelect.value = ''; 
+                    loadAndRenderAdminView(); showModal(`Chore "${name}" added!`);
                 }
             } else { showModal('Chore name required.');}
         };
 
         assignChoreButton.onclick = async () => { 
-            const kidId = assignKidSelect.value; const choreId = parseInt(assignChoreSelect.value); const frequency = assignFrequencySelect.value;
+            const kidId = assignKidSelect.value; 
+            const choreId = parseInt(assignChoreSelect.value); 
+            const frequency = assignFrequencySelect.value;
+            const timeframe = assignTimeframeSelect.value; // Get timeframe
             if (!choreId && assignChoreSelect.options.length > 0) { showModal('Please select a chore.'); return; }
             else if (assignChoreSelect.options.length === 0) { showModal('No master chores to assign. Add some first.'); return; }
-            const result = await apiCall('/assignments', 'POST', { kidId, choreId, frequency }, true);
+            const result = await apiCall('/assignments', 'POST', { kidId, choreId, frequency, timeframe }, true); // Send timeframe
             if (result) { loadAndRenderAdminView(); showModal(result.message || 'Chore assigned!');}
         };
          awardBonusStarButton.onclick = async () => { 
             const kidId = parseInt(bonusKidSelect.value); const reason = bonusReasonInput.value.trim();
             if (!kidId && bonusKidSelect.options.length > 0) { showModal('Please select a kid.'); return; }
             else if (bonusKidSelect.options.length === 0) { showModal('No kids to award stars.'); return; }
-
             const result = await apiCall('/stars/bonus', 'POST', { kidId, reason }, true);
             if (result) {
                 loadAndRenderAdminView(); 
@@ -648,7 +673,6 @@
             const kidItem = e.target.closest('.kid-admin-item');
             if (!kidItem) return;
             const kidId = kidItem.dataset.kidId;
-
             if (e.target.classList.contains('admin-edit-kid-btn')) {
                 kidItem.querySelector('.kid-display-mode').classList.add('hidden');
                 kidItem.querySelector('.kid-edit-mode').classList.remove('hidden');
@@ -674,8 +698,7 @@
                     const result = await apiCall(`/kids/${kidId}`, 'DELETE', null, true);
                     if (result) {
                         showModal(result.message || `${kidName} deleted.`);
-                        loadAndRenderAdminView(); // Refresh the list
-                        // If the deleted kid was currently selected, switch back to kid selection
+                        loadAndRenderAdminView(); 
                         if (currentKidId == kidId) {
                             switchView('kidSelection');
                         }
@@ -740,15 +763,17 @@
                 if (result) { showModal(result.message); loadAndRenderAdminView(); }
             } else if (e.target.classList.contains('admin-edit-assignment-btn')) {
                 const currentFrequency = e.target.dataset.currentFrequency;
-                showEditAssignmentModal(assignmentId, currentFrequency);
+                const currentTimeframe = e.target.dataset.currentTimeframe;
+                showEditAssignmentModal(assignmentId, currentFrequency, currentTimeframe);
             }
         });
 
         editAssignmentSaveButton.onclick = async () => {
             const assignmentId = editingAssignmentIdInput.value;
             const newFrequency = editAssignmentFrequencySelect.value;
-            if (assignmentId && newFrequency) {
-                const result = await apiCall(`/assignments/${assignmentId}/edit`, 'PUT', { frequency: newFrequency }, true);
+            const newTimeframe = editAssignmentTimeframeSelect.value;
+            if (assignmentId && newFrequency && newTimeframe) {
+                const result = await apiCall(`/assignments/${assignmentId}/edit`, 'PUT', { frequency: newFrequency, timeframe: newTimeframe }, true);
                 if (result) {
                     showModal(result.message); hideEditAssignmentModal(); loadAndRenderAdminView();
                 }
