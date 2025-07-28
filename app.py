@@ -1,20 +1,41 @@
-# chore_chart_project/app.py
-
-from flask import Flask, request, jsonify, render_template, g
+from flask import Flask, request, jsonify, render_template, g, redirect, url_for
+from flask_login import LoginManager, UserMixin, login_user, logout_user, login_required, current_user
+from flask_bcrypt import Bcrypt
 import sqlite3
 import os
-from datetime import date, datetime # Import datetime to check current time
+import secrets
+from datetime import date, datetime
 
-# --- App Configuration ---
 app = Flask(__name__)
+# Securely set the SECRET_KEY.
+# 1. Try to get it from an environment variable (best for production).
+# 2. If not found, generate a new random key for the current session.
+app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', secrets.token_hex(24))
 
-# Updated Database Path Configuration
+# --- Extensions ---
+bcrypt = Bcrypt(app)
+login_manager = LoginManager()
+login_manager.init_app(app)
+login_manager.login_view = 'login' 
+
 DATABASE_SUBDIR = 'data'
 DATABASE_FILENAME = 'chore_chart.db'
 DATABASE = os.path.join(DATABASE_SUBDIR, DATABASE_FILENAME) 
+
 BALLOONS_PER_STAR = 10
 
-# --- Database Setup & Helpers ---
+class User(UserMixin):
+    def __init__(self, id, username):
+        self.id = id
+        self.username = username
+
+@login_manager.user_loader
+def load_user(user_id):
+    user_data = query_db("SELECT * FROM users WHERE id = ?", (user_id,), one=True)
+    if user_data:
+        return User(id=user_data['id'], username=user_data['username'])
+    return None
+
 def init_db_schema(db_conn):
     """Initializes the database with the schema."""
     try:
@@ -29,33 +50,15 @@ def init_db_schema(db_conn):
 def get_db():
     db_path = os.path.join(app.root_path, DATABASE)
     db_dir = os.path.dirname(db_path)
-
     if not os.path.exists(db_dir):
-        try:
-            os.makedirs(db_dir)
-            print(f"Created database directory: {db_dir}")
-        except OSError as e:
-            print(f"Error creating database directory {db_dir}: {e}")
-            raise
-
+        os.makedirs(db_dir)
     db_needs_init = not os.path.exists(db_path)
-
     db = getattr(g, '_database', None)
     if db is None:
-        try:
-            print(f"Connecting to database: {db_path}")
-            db = g._database = sqlite3.connect(db_path)
-            db.row_factory = sqlite3.Row 
-            print(f"Successfully connected to database: {db_path}")
-
-            if db_needs_init:
-                print(f"Database file did not exist. Initializing schema...")
-                init_db_schema(db) 
-            else:
-                pass
-        except sqlite3.Error as e:
-            print(f"Error connecting to or initializing database {db_path}: {e}")
-            raise 
+        db = g._database = sqlite3.connect(db_path)
+        db.row_factory = sqlite3.Row 
+        if db_needs_init:
+            init_db_schema(db)
     return db
 
 @app.teardown_appcontext
@@ -79,8 +82,14 @@ def execute_db(query, args=()):
     cur.close()
     return last_row_id
 
-# --- Schema ---
 SCHEMA_SQL = """
+DROP TABLE IF EXISTS users;
+CREATE TABLE users (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    username TEXT UNIQUE NOT NULL,
+    password_hash TEXT NOT NULL
+);
+
 DROP TABLE IF EXISTS kids;
 CREATE TABLE kids (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -105,7 +114,7 @@ CREATE TABLE chore_assignments (
     chore_id INTEGER,
     frequency TEXT NOT NULL,
     is_active BOOLEAN DEFAULT 1, 
-    timeframe TEXT DEFAULT 'any', -- NEW: 'any', 'morning', 'night'
+    timeframe TEXT DEFAULT 'any',
     FOREIGN KEY (kid_id) REFERENCES kids (id) ON DELETE CASCADE,
     FOREIGN KEY (chore_id) REFERENCES chores_master (id) ON DELETE CASCADE
 );
@@ -133,35 +142,46 @@ CREATE TABLE stars (
     FOREIGN KEY (kid_id) REFERENCES kids (id) ON DELETE CASCADE
 );
 """
-# --- Admin Authentication ---
-def check_admin_auth():
-    auth_password = request.headers.get('X-Admin-Password')
-    return auth_password == ADMIN_PASSWORD
-
-# --- Helper: Update Train Laps ---
 def update_train_laps(kid_id):
     kid_info = query_db("SELECT train_track_length FROM kids WHERE id = ?", (kid_id,), one=True)
-    if not kid_info or kid_info['train_track_length'] <= 0:
-        return
+    if not kid_info or kid_info['train_track_length'] <= 0: return
     stars_count_data = query_db("SELECT COUNT(id) as count FROM stars WHERE kid_id = ?", (kid_id,), one=True)
     total_stars = stars_count_data['count'] if stars_count_data else 0
     new_laps = total_stars // kid_info['train_track_length']
     execute_db("UPDATE kids SET train_laps_completed = ? WHERE id = ?", (new_laps, kid_id))
 
-# --- API Endpoints ---
+# --- Public and Login Routes ---
 @app.route('/')
 def index():
     return render_template('index.html')
 
-# --- Admin Login Endpoint ---
-@app.route('/api/admin/login', methods=['POST'])
-def admin_login():
-    data = request.json
-    password_attempt = data.get('password')
-    if password_attempt == ADMIN_PASSWORD:
-        return jsonify({"success": True}), 200
-    else:
-        return jsonify({"error": "Incorrect password"}), 401
+@app.route('/login', methods=['GET', 'POST'])
+def login():
+    if request.method == 'POST':
+        username = request.form.get('username')
+        password = request.form.get('password')
+        user_data = query_db("SELECT * FROM users WHERE username = ?", (username,), one=True)
+        
+        if user_data and bcrypt.check_password_hash(user_data['password_hash'], password):
+            user = User(id=user_data['id'], username=user_data['username'])
+            login_user(user)
+            return redirect(url_for('admin_dashboard'))
+        else:
+            return render_template('login.html', error="Invalid username or password")
+    return render_template('login.html')
+
+@app.route('/logout')
+@login_required
+def logout():
+    logout_user()
+    return redirect(url_for('index'))
+
+@app.route('/admin')
+@login_required
+def admin_dashboard():
+    return render_template('admin.html')
+
+
 
 # --- Kids API ---
 @app.route('/api/kids', methods=['GET'])
@@ -173,8 +193,8 @@ def get_kids():
     return jsonify([dict(row) for row in kids_data])
 
 @app.route('/api/kids', methods=['POST'])
+@login_required
 def add_kid():
-    if not check_admin_auth(): return jsonify({"error": "Unauthorized"}), 401
     data = request.json; name = data.get('name'); avatar_color = data.get('avatarColor'); track_length = data.get('trainTrackLength', 10) 
     if not name: return jsonify({"error": "Kid name is required"}), 400
     kid_id = execute_db("INSERT INTO kids (name, avatar_color, balloons, train_track_length, train_laps_completed) VALUES (?, ?, 0, ?, 0)", 
@@ -182,8 +202,8 @@ def add_kid():
     return jsonify({"id": kid_id, "name": name, "avatarColor": avatar_color, "balloons": 0, "stars_count": 0, "train_track_length": track_length, "train_laps_completed": 0}), 201
 
 @app.route('/api/kids/<int:kid_id>', methods=['PUT'])
+@login_required
 def update_kid(kid_id):
-    if not check_admin_auth(): return jsonify({"error": "Unauthorized"}), 401
     data = request.json
     name = data.get('name')
     track_length = data.get('train_track_length')
@@ -197,8 +217,8 @@ def update_kid(kid_id):
     return jsonify(dict(updated_kid)), 200
 
 @app.route('/api/kids/<int:kid_id>', methods=['DELETE'])
+@login_required
 def delete_kid(kid_id):
-    if not check_admin_auth(): return jsonify({"error": "Unauthorized"}), 401
     kid_exists = query_db("SELECT id FROM kids WHERE id = ?", (kid_id,), one=True)
     if not kid_exists:
         return jsonify({"error": "Kid not found"}), 404
@@ -208,21 +228,22 @@ def delete_kid(kid_id):
 
 # --- Master Chores API ---
 @app.route('/api/chores-master', methods=['GET'])
+@login_required
 def get_master_chores():
     chores_data = query_db("SELECT * FROM chores_master")
     return jsonify([dict(row) for row in chores_data])
 
 @app.route('/api/chores-master', methods=['POST'])
+@login_required
 def add_master_chore():
-    if not check_admin_auth(): return jsonify({"error": "Unauthorized"}), 401
     data = request.json; name = data.get('name'); icon = data.get('icon')
     if not name: return jsonify({"error": "Chore name is required"}), 400
     chore_id = execute_db("INSERT INTO chores_master (name, icon) VALUES (?, ?)", (name, icon))
     return jsonify({"id": chore_id, "name": name, "icon": icon}), 201
 
 @app.route('/api/chores-master/<int:chore_id>', methods=['PUT'])
+@login_required
 def update_master_chore(chore_id):
-    if not check_admin_auth(): return jsonify({"error": "Unauthorized"}), 401
     data = request.json
     name = data.get('name')
     icon = data.get('icon', '') 
@@ -234,6 +255,7 @@ def update_master_chore(chore_id):
 
 # --- Chore Assignments API ---
 @app.route('/api/assignments', methods=['GET'])
+@login_required
 def get_assignments():
     sql = """
         SELECT ca.id, ca.kid_id, k.name as kid_name, ca.chore_id, 
@@ -247,13 +269,9 @@ def get_assignments():
 
 
 @app.route('/api/assignments', methods=['POST'])
+@login_required
 def add_assignment():
-    if not check_admin_auth(): return jsonify({"error": "Unauthorized"}), 401
-    data = request.json
-    kid_id_input = data.get('kidId')
-    chore_id = data.get('choreId')
-    frequency = data.get('frequency')
-    timeframe = data.get('timeframe', 'any') # Get timeframe, default to 'any'
+    data = request.json; kid_id_input = data.get('kidId'); chore_id = data.get('choreId'); frequency = data.get('frequency'); timeframe = data.get('timeframe', 'any')
     if not chore_id or not frequency: return jsonify({"error": "Chore ID and frequency are required"}), 400
     assigned_ids = []; kids_to_assign = []
     if kid_id_input == 'all':
@@ -272,14 +290,14 @@ def add_assignment():
     return jsonify({"message": "Chore(s) assigned successfully", "assignment_ids": assigned_ids}), 201
 
 @app.route('/api/assignments/<int:assignment_id>', methods=['DELETE'])
+@login_required
 def delete_assignment(assignment_id):
-    if not check_admin_auth(): return jsonify({"error": "Unauthorized"}), 401
     execute_db("DELETE FROM chore_assignments WHERE id = ?", (assignment_id,))
     return jsonify({"message": "Assignment removed"}), 200
 
 @app.route('/api/assignments/<int:assignment_id>/edit', methods=['PUT'])
+@login_required
 def edit_assignment(assignment_id):
-    if not check_admin_auth(): return jsonify({"error": "Unauthorized"}), 401
     data = request.json
     new_frequency = data.get('frequency')
     new_timeframe = data.get('timeframe')
@@ -289,8 +307,8 @@ def edit_assignment(assignment_id):
     return jsonify({"message": "Assignment updated."}), 200
 
 @app.route('/api/assignments/<int:assignment_id>/toggle-active', methods=['POST'])
+@login_required
 def toggle_assignment_active(assignment_id):
-    if not check_admin_auth(): return jsonify({"error": "Unauthorized"}), 401
     assignment = query_db("SELECT is_active FROM chore_assignments WHERE id = ?", (assignment_id,), one=True)
     if not assignment:
         return jsonify({"error": "Assignment not found"}), 404
@@ -299,7 +317,7 @@ def toggle_assignment_active(assignment_id):
     return jsonify({"message": f"Assignment {'activated' if new_status else 'deactivated'}.", "is_active": new_status}), 200
 
 
-# --- Chore Completions & Rewards API ---
+# --- Chore Completions & Rewards API (Publicly accessible for kids) ---
 def get_chores_for_kid_today_internal(kid_id, today_date_obj):
     today_date_str = today_date_obj.isoformat()
     day_of_week_idx = today_date_obj.weekday()
@@ -312,10 +330,7 @@ def get_chores_for_kid_today_internal(kid_id, today_date_obj):
         WHERE ca.kid_id = ? AND ca.is_active = 1 
     """
     all_kid_assignments = query_db(assigned_chores_sql, (kid_id,))
-    
-    # Initialize lists for each timeframe
     chores_due_today = {'morning': [], 'night': [], 'any': []}
-
     for assignment in all_kid_assignments:
         assignment_dict = dict(assignment); is_due = False
         if assignment_dict['frequency'] == 'daily': is_due = True
@@ -326,29 +341,20 @@ def get_chores_for_kid_today_internal(kid_id, today_date_obj):
             completion = query_db("SELECT id FROM chore_completions WHERE assignment_id = ? AND kid_id = ? AND date_completed = ?",
                                   (assignment_dict['assignment_id'], kid_id, today_date_str), one=True)
             assignment_dict['completed_today'] = True if completion else False
-            
-            # Add to the correct timeframe list
             timeframe = assignment_dict.get('timeframe', 'any')
             if timeframe in chores_due_today:
                 chores_due_today[timeframe].append(assignment_dict)
-            else: # Fallback for any other value
+            else:
                 chores_due_today['any'].append(assignment_dict)
-
     return chores_due_today
 
 @app.route('/api/kids/<int:kid_id>/chores-today', methods=['GET'])
 def get_kid_chores_today_api(kid_id):
     chores_by_timeframe = get_chores_for_kid_today_internal(kid_id, date.today())
-    
-    # Determine current timeframe
     current_hour = datetime.now().hour
-    if current_hour < 12: # Before noon is morning
-        current_timeframe = 'morning'
-    elif current_hour >= 17: # 5 PM or later is night
-        current_timeframe = 'night'
-    else: # Afternoon, no specific routine
-        current_timeframe = 'any'
-
+    if current_hour < 12: current_timeframe = 'morning'
+    elif current_hour >= 17: current_timeframe = 'night'
+    else: current_timeframe = 'any'
     kid_info = query_db("SELECT k.id, k.name, k.avatar_color, k.balloons, k.train_track_length, k.train_laps_completed, COUNT(s.id) as stars_count FROM kids k LEFT JOIN stars s ON k.id = s.kid_id WHERE k.id = ? GROUP BY k.id", (kid_id,), one=True)
     if not kid_info: return jsonify({"error": "Kid not found"}), 404
     return jsonify({
@@ -377,7 +383,6 @@ def mark_chore_complete():
             update_train_laps(kid_id) 
     daily_star_awarded_this_action = False
     chores_due_today = get_chores_for_kid_today_internal(kid_id, today_date_obj)
-    # Check if all chores (across all timeframes) are done
     all_chores_for_day = chores_due_today['morning'] + chores_due_today['night'] + chores_due_today['any']
     if all_chores_for_day:
         all_done = all(c['completed_today'] for c in all_chores_for_day)
@@ -423,8 +428,8 @@ def uncheck_chore_complete():
 
 # --- Bonus Stars API ---
 @app.route('/api/stars/bonus', methods=['POST'])
+@login_required
 def award_bonus_star():
-    if not check_admin_auth(): return jsonify({"error": "Unauthorized"}), 401
     data = request.json; kid_id = data.get('kidId'); reason = data.get('reason', '')
     today_date_str = date.today().isoformat()
     if not kid_id: return jsonify({"error": "Kid ID is required"}), 400
@@ -434,8 +439,8 @@ def award_bonus_star():
 
 # --- Admin Reset & Decrement Endpoints ---
 @app.route('/api/admin/kids/<int:kid_id>/reset-daily-chores', methods=['POST'])
+@login_required
 def admin_reset_daily_chores(kid_id): 
-    if not check_admin_auth(): return jsonify({"error": "Unauthorized"}), 401
     today_date_str = date.today().isoformat()
     execute_db("DELETE FROM chore_completions WHERE kid_id = ? AND date_completed = ?", (kid_id, today_date_str))
     daily_star_record = query_db("SELECT id FROM stars WHERE kid_id = ? AND date_awarded = ? AND type = 'daily'", (kid_id, today_date_str), one=True)
@@ -445,8 +450,8 @@ def admin_reset_daily_chores(kid_id):
     return jsonify({"message": f"Daily chores and daily star (if any) for kid {kid_id} reset for today."}), 200
 
 @app.route('/api/admin/kids/<int:kid_id>/decrement-balloons', methods=['POST'])
+@login_required
 def admin_decrement_balloons(kid_id): 
-    if not check_admin_auth(): return jsonify({"error": "Unauthorized"}), 401
     data = request.json; count = data.get('count', 1)
     try: count = int(count)
     except ValueError: return jsonify({"error": "Invalid count"}), 400
@@ -457,8 +462,8 @@ def admin_decrement_balloons(kid_id):
     return jsonify({"message": f"{count} balloon(s) decremented for kid {kid_id}. New total: {new_balloons}."}), 200
 
 @app.route('/api/admin/kids/<int:kid_id>/decrement-stars', methods=['POST'])
+@login_required
 def admin_decrement_stars(kid_id): 
-    if not check_admin_auth(): return jsonify({"error": "Unauthorized"}), 401
     data = request.json; count = data.get('count', 1); star_type_filter = data.get('type', None)
     try: count = int(count)
     except ValueError: return jsonify({"error": "Invalid count"}), 400
@@ -473,8 +478,8 @@ def admin_decrement_stars(kid_id):
     return jsonify({"message": f"{len(stars_to_delete)} star(s) decremented for kid {kid_id}."}), 200
 
 @app.route('/api/admin/kids/<int:kid_id>/train-config', methods=['PUT'])
+@login_required
 def admin_configure_train_track(kid_id): 
-    if not check_admin_auth(): return jsonify({"error": "Unauthorized"}), 401
     data = request.json; track_length = data.get('train_track_length')
     try: track_length = int(track_length)
     except (ValueError, TypeError): return jsonify({"error": "Invalid track length"}), 400
