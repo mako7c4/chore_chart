@@ -12,8 +12,6 @@ app = Flask(__name__)
 DATABASE_SUBDIR = 'data'
 DATABASE_FILENAME = 'chore_chart.db'
 DATABASE = os.path.join(DATABASE_SUBDIR, DATABASE_FILENAME) 
-
-ADMIN_PASSWORD = os.environ.get('ADMIN_PASSWORD', 'supersecret')
 BALLOONS_PER_STAR = 10
 
 # --- Database Setup & Helpers ---
